@@ -1,0 +1,22 @@
+---
+import Pagination from "../components/control/Pagination.astro";
+import PostPage from "../components/PostPage.astro";
+import { PAGE_SIZE } from "../constants/constants";
+import MainGridLayout from "../layouts/MainGridLayout.astro";
+import { getSortedPosts, paginatePosts } from "../utils/content-utils";
+
+// SSR pagination: `/` is page 1, `/2/` is page 2, anything else is 404.
+const rawPage = Astro.params.page;
+const current = rawPage === undefined ? 1 : Number(rawPage);
+const page = paginatePosts(await getSortedPosts(), current, PAGE_SIZE);
+if (!page) {
+	return new Response("Not Found", { status: 404 });
+}
+
+const len = page.data.length;
+---
+
+<MainGridLayout>
+    <PostPage page={page}></PostPage>
+    <Pagination class="mx-auto onload-animation" page={page} style={`animation-delay: calc(var(--content-delay) + ${(len)*50}ms)`}></Pagination>
+</MainGridLayout>

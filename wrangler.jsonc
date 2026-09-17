@@ -1,0 +1,28 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "fuwari-cms",
+	// Unified entrypoint provided by @astrojs/cloudflare >= 13; serves both `astro dev` and production.
+	"main": "@astrojs/cloudflare/entrypoints/server",
+	"compatibility_date": "2026-08-12",
+	"compatibility_flags": ["nodejs_compat"],
+	"assets": {
+		"directory": "./dist",
+		"binding": "ASSETS"
+	},
+	"observability": {
+		"enabled": true
+	},
+	// Placeholder id is enough for `--local`; replace with the real id from `wrangler d1 create fuwari-cms` before deploy.
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "fuwari-cms",
+			"database_id": "00000000-0000-0000-0000-000000000000",
+			"migrations_dir": "migrations"
+		}
+	],
+	// Declared secrets are validated on deploy and typed by `wrangler types`; never put values here.
+	"secrets": {
+		"required": ["SESSION_SECRET"]
+	}
+}

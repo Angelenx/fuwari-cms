@@ -1,0 +1,25 @@
+{
+	"extends": "astro/tsconfigs/strict",
+	"compilerOptions": {
+		"strictNullChecks": true,
+		"allowJs": false,
+		// TS 6+ resolves `paths` from this file; `baseUrl` is deprecated and not needed when it was `.`.
+		"paths": {
+			"@components/*": ["./src/components/*"],
+			"@assets/*": ["./src/assets/*"],
+			"@constants/*": ["./src/constants/*"],
+			"@utils/*": ["./src/utils/*"],
+			"@i18n/*": ["./src/i18n/*"],
+			"@layouts/*": ["./src/layouts/*"],
+			"@lib/*": ["./src/lib/*"],
+			"@/*": ["./src/*"]
+		}
+	},
+	"include": [
+		"src/**/*",
+		"tests/**/*",
+		".astro/types.d.ts",
+		"worker-configuration.d.ts"
+	],
+	"exclude": ["dist", "node_modules"]
+}

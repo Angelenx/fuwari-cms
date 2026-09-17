@@ -1,0 +1,2 @@
+# Copy to .dev.vars for local development. Production values go through `wrangler secret put`.
+SESSION_SECRET="replace-with-a-long-random-string"

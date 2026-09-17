@@ -1,0 +1,15 @@
+/*
+ * Single PostCSS root for the theme CSS. Tailwind 3 can only `@apply` custom
+ * `@layer components` classes (e.g. `link`, `btn-regular-dark` from main.css)
+ * inside the same root, so the files are combined via @import instead of being
+ * imported one by one. Stylus files carry no `@apply` and stay separate.
+ * Replaces the base.css that @astrojs/tailwind used to inject.
+ */
+@import "tailwindcss/base";
+@import "./main.css";
+@import "./markdown.css";
+@import "./scrollbar.css";
+@import "./transition.css";
+@import "./photoswipe.css";
+@import "./expressive-code.css";
+@import "tailwindcss/utilities";

@@ -1,0 +1,48 @@
+# NOTICE
+
+本项目（Fuwari CMS）复用 / 改编下列开源软件。
+
+## 本项目自有内容
+
+- Copyright (c) 2026 Angelen Atano
+- 许可：MIT License（见仓库根目录 `LICENSE`）
+- 范围：本仓库中的文档、以及由本项目作者编写的 CMS / API / 管理端等自有代码（`src/fetch.ts`、`src/api/**`、`src/lib/**`、`src/types/post.ts`、`tests/**` 等）
+
+## 第三方组件
+
+### Fuwari（前台主题基础，已合入）
+
+- 项目：https://github.com/saicaca/fuwari
+- Copyright (c) 2024 saicaca
+- 许可：MIT License
+- 原文副本：`third_party/fuwari/LICENSE`
+- 合入提交：`6d39b0d`；已拷贝 / 改编的文件清单见 `third_party/fuwari/README.md`
+- 用途：公开站视觉与信息架构（布局、组件、样式、i18n 等）
+
+MIT 要求：在所有副本或实质性部分中保留上述版权声明与许可声明。上游源文件没有逐文件版权头，本仓库以本 NOTICE 与 `third_party/fuwari/` 目录作为归属声明。
+
+### 其它依赖（以各包 `package.json` / SPDX 为准）
+
+下列组件许可证均为宽松型，与选用 MIT 兼容；完整清单见 `package.json` 与 `pnpm-lock.yaml`：
+
+| 组件 | 常见许可 | 用途 |
+|------|----------|------|
+| Astro | MIT | 站点框架 |
+| @astrojs/cloudflare | MIT | Cloudflare 适配 |
+| Hono | MIT | `/api` |
+| Tailwind CSS | MIT | 样式（随主题） |
+| Svelte | MIT | Fuwari 中部分交互岛 |
+| Swup、astro-icon、KaTeX、PhotoSwipe、OverlayScrollbars | MIT | 页面切换、图标渲染、公式、灯箱、滚动条（随主题） |
+| Iconify 图标集：Material Symbols | Apache-2.0 | 图标 |
+| Iconify 图标集：Font Awesome 6 Free | CC-BY-4.0（图标） | 图标；需保留 Font Awesome 归属 |
+| Fontsource Roboto / JetBrains Mono | OFL-1.1 | 字体（随主题） |
+
+Cloudflare 运行时本身（Workers / D1 / R2 / Workers AI）为托管服务，不构成本仓库源代码许可的一部分；使用时遵守 Cloudflare 服务条款。
+
+## 未采用的方案（避免许可混淆）
+
+调研中出现过 GPL-3.0 等成品（例如部分“Fuwari 风 + D1”全栈博客）。**本仓库不基于 GPL 项目派生**，以免与「MIT 主题复用 + 自建 CMS」路径冲突。若未来引入强 copyleft 依赖，须单独评估并更新本 NOTICE。
+
+## 文档中的名称与商标
+
+“Cloudflare”“Workers”“D1”“R2”“Workers AI”等为对应权利人的商标或产品名，提及仅用于说明技术选型，不表示附属或背书。
