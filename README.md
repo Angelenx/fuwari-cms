@@ -161,7 +161,7 @@ pnpm test                        # Vitest，跑在 workerd
 
 `.dev.vars` 里的 `SESSION_SECRET` 换成足够长的随机串。首次打开 http://localhost:4321/admin/login 为用户名 `admin` 设密码（≥ 8，`users` 为空时）。登录后：
 
-- `/admin` 文章
+- `/admin` 文章（按发布时间轴，可搜，可按 Tag / 状态筛）
 - `/admin/profile` 头像、简介、三链、banner
 - `/admin/site` 标题、页脚、默认语言
 - `/admin/about` About Markdown

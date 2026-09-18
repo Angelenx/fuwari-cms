@@ -16,6 +16,7 @@ export type AdminPostListItem = {
 	status: AdminPostStatus;
 	publishedAt: string | null;
 	updatedAt: string | null;
+	tags: string[];
 };
 
 export type AdminPost = AdminPostListItem & {
@@ -24,7 +25,19 @@ export type AdminPost = AdminPostListItem & {
 	coverUrl: string;
 	category: string | null;
 	lang: string;
-	tags: string[];
+};
+
+export type AdminPostListStatus = "all" | AdminPostStatus;
+
+export type AdminPostListFilter = {
+	q?: string;
+	tag?: string;
+	status?: AdminPostListStatus;
+};
+
+export type AdminTag = {
+	name: string;
+	count: number;
 };
 
 export type PostWriteInput = {
@@ -48,6 +61,7 @@ type ListRow = {
 	status: AdminPostStatus;
 	published_at: string | null;
 	updated_at: string | null;
+	tag_names: string | null;
 };
 
 type DetailRow = ListRow & {
@@ -56,7 +70,6 @@ type DetailRow = ListRow & {
 	cover_url: string;
 	category: string | null;
 	lang: string;
-	tag_names: string | null;
 };
 
 function nowIso(): string {
@@ -71,6 +84,7 @@ function rowToListItem(row: ListRow): AdminPostListItem {
 		status: row.status,
 		publishedAt: sqliteDateToIso(row.published_at),
 		updatedAt: sqliteDateToIso(row.updated_at),
+		tags: row.tag_names ? row.tag_names.split(",") : [],
 	};
 }
 
@@ -82,8 +96,31 @@ function rowToPost(row: DetailRow): AdminPost {
 		coverUrl: row.cover_url,
 		category: row.category,
 		lang: row.lang,
-		tags: row.tag_names ? row.tag_names.split(",") : [],
 	};
+}
+
+/** Normalize `/admin` and `GET /api/admin/posts` query strings. */
+export function parseAdminPostListFilter(input: {
+	q?: string | null;
+	tag?: string | null;
+	status?: string | null;
+}): AdminPostListFilter {
+	const q = input.q?.trim() || undefined;
+	const tag = input.tag?.trim() || undefined;
+	const status: AdminPostListStatus =
+		input.status === "draft" || input.status === "published"
+			? input.status
+			: "all";
+	return { q, tag, status };
+}
+
+/** Strip LIKE wildcards so user input is a literal substring. */
+function containsPattern(q: string): string | undefined {
+	const literal = q.replace(/[%_]/g, "");
+	if (!literal) {
+		return undefined;
+	}
+	return `%${literal}%`;
 }
 
 async function replaceTags(postId: number, tags: string[]): Promise<void> {
@@ -135,13 +172,73 @@ FROM posts p
 LEFT JOIN post_tags pt ON pt.post_id = p.id
 LEFT JOIN tags t ON t.id = pt.tag_id`;
 
-export async function listAdminPosts(): Promise<AdminPostListItem[]> {
-	const { results } = await env.DB.prepare(
-		`SELECT id, slug, title, status, published_at, updated_at
-		 FROM posts
-		 ORDER BY COALESCE(updated_at, created_at) DESC, id DESC`,
+const LIST_SELECT = `SELECT
+	p.id,
+	p.slug,
+	p.title,
+	p.status,
+	p.published_at,
+	p.updated_at,
+	GROUP_CONCAT(t.name) AS tag_names
+FROM posts p
+LEFT JOIN post_tags pt ON pt.post_id = p.id
+LEFT JOIN tags t ON t.id = pt.tag_id`;
+
+export async function listAdminPosts(
+	filters: AdminPostListFilter = {},
+): Promise<AdminPostListItem[]> {
+	const parsed = parseAdminPostListFilter(filters);
+	const clauses: string[] = [];
+	const binds: string[] = [];
+
+	if (parsed.status !== "all") {
+		clauses.push("p.status = ?");
+		binds.push(parsed.status);
+	}
+
+	const pattern = parsed.q ? containsPattern(parsed.q) : undefined;
+	if (pattern) {
+		// ponytail: LIKE over body_md is enough for a personal blog. Upgrade: D1 FTS5 (PLAN 二期).
+		clauses.push(
+			"(p.title LIKE ? OR p.slug LIKE ? OR p.description LIKE ? OR p.body_md LIKE ?)",
+		);
+		binds.push(pattern, pattern, pattern, pattern);
+	}
+
+	if (parsed.tag) {
+		clauses.push(`p.id IN (
+			SELECT pt2.post_id FROM post_tags pt2
+			JOIN tags t2 ON t2.id = pt2.tag_id
+			WHERE t2.name = ?
+		)`);
+		binds.push(parsed.tag);
+	}
+
+	const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+	const sql = `${LIST_SELECT}
+		${where}
+		GROUP BY p.id
+		ORDER BY (p.published_at IS NULL), p.published_at DESC, p.id DESC`;
+	const stmt = env.DB.prepare(sql);
+	const { results } = await (binds.length > 0
+		? stmt.bind(...binds)
+		: stmt
 	).all<ListRow>();
 	return results.map(rowToListItem);
+}
+
+export async function listAdminTags(): Promise<AdminTag[]> {
+	const { results } = await env.DB.prepare(
+		`SELECT t.name AS name, COUNT(pt.post_id) AS count
+		 FROM tags t
+		 JOIN post_tags pt ON pt.tag_id = t.id
+		 GROUP BY t.id
+		 ORDER BY t.name COLLATE NOCASE`,
+	).all<{ name: string; count: number }>();
+	return results.map((row) => ({
+		name: row.name,
+		count: Number(row.count),
+	}));
 }
 
 export async function getAdminPost(id: number): Promise<AdminPost | undefined> {

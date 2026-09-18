@@ -6,6 +6,7 @@ import {
 	getAdminPost,
 	listAdminPosts,
 	type PostWriteInput,
+	parseAdminPostListFilter,
 	updatePost,
 } from "../lib/admin-posts";
 import { hashPassword, verifyPassword } from "../lib/auth/password";
@@ -228,7 +229,15 @@ function isUniqueError(err: unknown): boolean {
 
 const posts = new Hono<AppEnv>()
 	.get("/", async (c) => {
-		return c.json({ posts: await listAdminPosts() });
+		return c.json({
+			posts: await listAdminPosts(
+				parseAdminPostListFilter({
+					q: c.req.query("q"),
+					tag: c.req.query("tag"),
+					status: c.req.query("status"),
+				}),
+			),
+		});
 	})
 	.post("/", async (c) => {
 		let body: unknown;
