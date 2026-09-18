@@ -1,0 +1,9 @@
+# Matches Biome (`biome.json`: tabs, LF). `eol=lf` in .gitattributes is the
+# source of truth for git; this file is for editors that honor EditorConfig.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = tab

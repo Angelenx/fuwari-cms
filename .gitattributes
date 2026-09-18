@@ -1,0 +1,4 @@
+# Checkout and commit as LF regardless of core.autocrlf. The `eol` attribute
+# takes precedence over autocrlf, so Windows checkouts stay LF and Biome
+# (which writes LF) no longer fights git for line-ending noise.
+* text=auto eol=lf

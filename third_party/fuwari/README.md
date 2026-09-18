@@ -19,7 +19,8 @@ Copied verbatim, then adapted where noted:
 | `src/utils/content-utils.ts` | rewritten: same exports, backed by `src/lib/posts.ts` instead of Content Collections |
 | `src/pages/{[...page],about,archive,rss.xml,robots.txt}.astro/ts`, `src/pages/posts/[...slug].astro` | rewritten for on-demand rendering without `getStaticPaths` / `astro:content` |
 | `public/favicon/**` | unchanged |
-| `biome.json`, `tailwind.config.cjs`, `postcss.config.mjs`, `svelte.config.js` | unchanged |
+| `biome.json`, `tailwind.config.cjs` | unchanged |
+| `postcss.config.mjs`, `svelte.config.js` | inlined into `astro.config.mjs`, files removed |
 
 Not taken: `src/content/**` (Content Collections), `src/plugins/**` (remark/rehype/Expressive Code plugins; scheduled for the write-time Markdown renderer in PLAN.md phase 4), `astro.config.mjs` (rewritten), Pagefind wiring, `@astrojs/tailwind`, `@astrojs/sitemap`.
 
