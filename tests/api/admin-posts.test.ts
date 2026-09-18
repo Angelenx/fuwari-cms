@@ -70,6 +70,24 @@ describe("admin post CRUD", () => {
 					body: "{}",
 				},
 			],
+			["/admin/site", {}],
+			[
+				"/admin/site",
+				{
+					method: "PUT",
+					headers: { "content-type": "application/json" },
+					body: "{}",
+				},
+			],
+			["/admin/about", {}],
+			[
+				"/admin/about",
+				{
+					method: "PUT",
+					headers: { "content-type": "application/json" },
+					body: "{}",
+				},
+			],
 			["/admin/posts/1", {}],
 			[
 				"/admin/posts/1",

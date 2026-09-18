@@ -198,12 +198,18 @@ const { isNew, post } = Astro.props;
 		});
 		const body = await res.json().catch(() => ({}));
 		if (!res.ok) {
-			errorEl.textContent =
-				typeof body.error === "string" ? body.error : "Could not save.";
-			errorEl.classList.remove("hidden");
+			window.adminToast(
+				false,
+				typeof body.error === "string" ? body.error : "Could not save.",
+			);
 			return;
 		}
-		location.assign(`/admin/posts/${body.post.id}`);
+		if (isNew) {
+			window.queueAdminToast(true, "Saved.");
+			location.assign(`/admin/posts/${body.post.id}`);
+			return;
+		}
+		window.adminToast(true, "Saved.");
 	});
 </script>
 <style>

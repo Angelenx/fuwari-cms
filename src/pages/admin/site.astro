@@ -1,0 +1,86 @@
+---
+import { env } from "cloudflare:workers";
+import AdminChrome from "@components/admin/AdminChrome.astro";
+import { getSessionFromRequest } from "@lib/auth/session";
+import { getSiteSettings } from "@lib/site-settings";
+
+const user = await getSessionFromRequest(Astro.request, env);
+if (!user) {
+	return Astro.redirect("/admin/login");
+}
+
+const { site } = await getSiteSettings();
+---
+
+<AdminChrome loggedIn title="Site">
+	<form class="card-base space-y-3 p-6" id="site-form">
+		<label class="block text-sm">
+			Title
+			<input
+				class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+				name="title"
+				required
+				value={site.title}
+			/>
+		</label>
+		<label class="block text-sm">
+			Subtitle
+			<input
+				class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+				name="subtitle"
+				value={site.subtitle}
+			/>
+		</label>
+		<label class="block text-sm">
+			Footer
+			<input
+				class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+				name="footer"
+				value={site.footer}
+			/>
+		</label>
+		<label class="block text-sm">
+			Default language
+			<select
+				class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+				name="lang"
+			>
+				<option selected={site.lang === "en"} value="en">
+					English
+				</option>
+				<option selected={site.lang === "zh_CN"} value="zh_CN">
+					简体中文
+				</option>
+			</select>
+		</label>
+		<button class="btn-regular rounded-lg px-3 py-2 text-sm" type="submit">
+			Save
+		</button>
+	</form>
+	<script is:inline>
+		const form = document.getElementById("site-form");
+		form.addEventListener("submit", async (event) => {
+			event.preventDefault();
+			const data = new FormData(form);
+			const res = await fetch("/api/admin/site", {
+				method: "PUT",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					title: data.get("title") ?? "",
+					subtitle: data.get("subtitle") ?? "",
+					footer: data.get("footer") ?? "",
+					lang: data.get("lang") ?? "",
+				}),
+			});
+			const body = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				window.adminToast(
+					false,
+					typeof body.error === "string" ? body.error : "Could not save.",
+				);
+				return;
+			}
+			window.adminToast(true, "Saved.");
+		});
+	</script>
+</AdminChrome>

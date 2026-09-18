@@ -1,9 +1,13 @@
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 import { profileConfig, siteConfig } from "../../src/config";
+import { getSpecPageHtml } from "../../src/lib/posts";
 import {
+	DEFAULT_ABOUT_HTML,
 	getSiteSettings,
 	parseSiteSettingsInput,
+	upsertAbout,
+	upsertSiteIdentity,
 	upsertSiteSettings,
 } from "../../src/lib/site-settings";
 
@@ -23,6 +27,12 @@ describe("site settings", () => {
 		]);
 		expect(settings.banner.src).toBe(siteConfig.banner.src);
 		expect(settings.banner.enable).toBe(siteConfig.banner.enable);
+		expect(settings.site.title).toBe(siteConfig.title);
+		expect(settings.site.subtitle).toBe(siteConfig.subtitle);
+		expect(settings.site.lang).toBe("en");
+		expect(settings.site.footer).toBe(`Powered by Astro & ${siteConfig.title}`);
+		expect(settings.about.html).toBe(DEFAULT_ABOUT_HTML);
+		expect(await getSpecPageHtml("about")).toBe(DEFAULT_ABOUT_HTML);
 	});
 
 	it("falls back per field when stored values are blank", async () => {
@@ -37,6 +47,8 @@ describe("site settings", () => {
 		expect(settings.profile.links[0]?.url).toBe(profileConfig.links[0]?.url);
 		expect(settings.banner.enable).toBe(false);
 		expect(settings.banner.src).toBe(siteConfig.banner.src);
+		expect(settings.site.title).toBe(siteConfig.title);
+		expect(settings.about.html).toBe(DEFAULT_ABOUT_HTML);
 	});
 
 	it("reads back an upsert and rejects javascript: avatar", async () => {
@@ -78,5 +90,25 @@ describe("site settings", () => {
 			},
 		});
 		expect(parsed).toEqual({ error: "Invalid avatar" });
+	});
+
+	it("saves site identity and about without wiping profile defaults", async () => {
+		const branded = await upsertSiteIdentity({
+			title: "Ada Blog",
+			subtitle: "Notes",
+			footer: "",
+			lang: "zh_CN",
+		});
+		expect(branded.site.title).toBe("Ada Blog");
+		expect(branded.site.footer).toBe("Powered by Astro & Ada Blog");
+		expect(branded.site.lang).toBe("zh_CN");
+		expect(branded.profile.name).toBe(profileConfig.name);
+
+		const about = await upsertAbout({
+			bodyMd: "Hello **Ada**",
+			bodyHtml: "<p>Hello <strong>Ada</strong></p>",
+		});
+		expect(about.site.title).toBe("Ada Blog");
+		expect(await getSpecPageHtml("about")).toContain("Ada");
 	});
 });

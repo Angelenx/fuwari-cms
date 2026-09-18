@@ -146,17 +146,14 @@ const [csdn, bilibili, github] = profile.links;
 				/>
 			</label>
 		</section>
-		<p class="hidden text-sm text-red-600" id="form-error"></p>
 		<button class="btn-regular rounded-lg px-3 py-2 text-sm" type="submit">
 			Save
 		</button>
 	</form>
 	<script is:inline>
 		const form = document.getElementById("profile-form");
-		const errorEl = document.getElementById("form-error");
 		form.addEventListener("submit", async (event) => {
 			event.preventDefault();
-			errorEl.classList.add("hidden");
 			const data = new FormData(form);
 			const res = await fetch("/api/admin/profile", {
 				method: "PUT",
@@ -184,12 +181,13 @@ const [csdn, bilibili, github] = profile.links;
 			});
 			const body = await res.json().catch(() => ({}));
 			if (!res.ok) {
-				errorEl.textContent =
-					typeof body.error === "string" ? body.error : "Could not save.";
-				errorEl.classList.remove("hidden");
+				window.adminToast(
+					false,
+					typeof body.error === "string" ? body.error : "Could not save.",
+				);
 				return;
 			}
-			location.assign("/admin/profile");
+			window.adminToast(true, "Saved.");
 		});
 	</script>
 </AdminChrome>

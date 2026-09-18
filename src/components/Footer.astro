@@ -3,7 +3,7 @@
 import { getSiteSettings } from "@lib/site-settings";
 import { url } from "../utils/url-utils";
 
-const { profile } = await getSiteSettings();
+const { profile, site } = await getSiteSettings();
 const currentYear = new Date().getFullYear();
 ---
 
@@ -12,8 +12,6 @@ const currentYear = new Date().getFullYear();
     <div class="transition text-50 text-sm text-center">
         &copy; <span id="copyright-year">{currentYear}</span> {profile.name}. All Rights Reserved. /
         <a class="transition link text-[var(--primary)] font-medium" target="_blank" href={url('rss.xml')}>RSS</a><br>
-        Powered by
-        <a class="transition link text-[var(--primary)] font-medium" target="_blank" href="https://astro.build">Astro</a> &
-        <a class="transition link text-[var(--primary)] font-medium" target="_blank" href="https://github.com/saicaca/fuwari">Fuwari</a>
+        {site.footer}
     </div>
 </div>

@@ -17,8 +17,8 @@ import {
 	PAGE_WIDTH,
 } from "../constants/constants";
 import { defaultFavicons } from "../constants/icon";
+import { getUiLocale } from "../i18n/locale";
 import type { Favicon } from "../types/config";
-import { pathsEqual, url } from "../utils/url-utils";
 import "katex/dist/katex.css";
 // Fuwari only loads src/styles implicitly through ImageWrapper's `import.meta.glob("../../**")`.
 // That glob is narrowed to assets here, so the theme stylesheets are imported explicitly.
@@ -35,7 +35,7 @@ interface Props {
 }
 
 let { title, description, lang, setOGTypeArticle } = Astro.props;
-const { profile, banner: bannerSettings } = await getSiteSettings();
+const { profile, banner: bannerSettings, site } = await getSiteSettings();
 
 // apply a class to the body element to decide the height of the banner, only used for initial page load
 // Swup can update the body for each page visit, but it's after the page transition, causing a delay for banner height change
@@ -49,9 +49,9 @@ const enableBanner = bannerSettings.enable;
 
 let pageTitle: string;
 if (title) {
-	pageTitle = `${title} - ${siteConfig.title}`;
+	pageTitle = `${title} - ${site.title}`;
 } else {
-	pageTitle = `${siteConfig.title} - ${siteConfig.subtitle}`;
+	pageTitle = `${site.title} - ${site.subtitle}`;
 }
 
 const favicons: Favicon[] =
@@ -59,7 +59,7 @@ const favicons: Favicon[] =
 
 // const siteLang = siteConfig.lang.replace('_', '-')
 if (!lang) {
-	lang = `${siteConfig.lang}`;
+	lang = getUiLocale();
 }
 const siteLang = lang.replace("_", "-");
 
@@ -84,7 +84,7 @@ const bannerOffset =
 		<meta name="description" content={description || pageTitle}>
 		<meta name="author" content={profile.name}>
 
-		<meta property="og:site_name" content={siteConfig.title}>
+		<meta property="og:site_name" content={site.title}>
 		<meta property="og:url" content={Astro.url}>
 		<meta property="og:title" content={pageTitle}>
 		<meta property="og:description" content={description || pageTitle}>

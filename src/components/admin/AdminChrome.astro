@@ -26,6 +26,21 @@ interface Props {
 const { title, loggedIn = false, center = false } = Astro.props;
 const { profile } = await getSiteSettings();
 const configHue = siteConfig.themeColor.hue;
+const path = Astro.url.pathname.replace(/\/+$/, "") || "/";
+const tabs = [
+	{
+		href: "/admin",
+		label: "Posts",
+		current: path === "/admin" || path.startsWith("/admin/posts"),
+	},
+	{
+		href: "/admin/profile",
+		label: "Profile",
+		current: path === "/admin/profile",
+	},
+	{ href: "/admin/site", label: "Site", current: path === "/admin/site" },
+	{ href: "/admin/about", label: "About", current: path === "/admin/about" },
+];
 ---
 
 <html
@@ -67,58 +82,69 @@ const configHue = siteConfig.themeColor.hue;
 		</script>
 	</head>
 	<body class="min-h-screen text-[var(--deep-text)]">
-		<header
-			class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line-color)] bg-[var(--card-bg)] px-4 py-3"
-		>
-			<div class="flex items-center gap-3 min-w-0">
-				<a
-					aria-label={`${profile.name} about page`}
-					class="h-10 w-10 shrink-0 overflow-hidden rounded-full"
-					href={url("/about/")}
-				>
-					<ImageWrapper
-						alt={`Profile image of ${profile.name}`}
-						class="h-10 w-10"
-						src={profile.avatar || ""}
-					/>
-				</a>
-				<div class="min-w-0">
-					<p class="truncate font-bold">{profile.name}</p>
-					<h1 class="truncate text-sm text-[var(--btn-content)]">{title}</h1>
+		<div class="admin-chrome border-b border-[var(--line-color)] bg-[var(--card-bg)]">
+			<header class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+				<div class="flex min-w-0 items-center gap-3">
+					<a
+						aria-label={`${profile.name} about page`}
+						class="h-10 w-10 shrink-0 overflow-hidden rounded-full"
+						href={url("/about/")}
+					>
+						<ImageWrapper
+							alt={`Profile image of ${profile.name}`}
+							class="h-10 w-10"
+							src={profile.avatar || ""}
+						/>
+					</a>
+					<div class="min-w-0">
+						<p class="truncate font-bold">{profile.name}</p>
+						<h1 class="truncate text-sm text-[var(--btn-content)]">{title}</h1>
+					</div>
 				</div>
-			</div>
-			<div class="flex flex-wrap items-center gap-2">
-				{
-					loggedIn && (
-						<>
-							<a class="btn-regular rounded-lg px-3 py-2 text-sm" href="/admin">
-								Posts
-							</a>
-							<a
+				<div class="flex flex-wrap items-center gap-2">
+					<slot name="actions" />
+					{
+						loggedIn && (
+							<button
 								class="btn-regular rounded-lg px-3 py-2 text-sm"
-								href="/admin/profile"
+								id="admin-logout"
+								type="button"
 							>
-								Profile
-							</a>
-						</>
-					)
-				}
-				<slot name="actions" />
-				{
-					loggedIn && (
-						<button
-							class="btn-regular rounded-lg px-3 py-2 text-sm"
-							id="admin-logout"
-							type="button"
-						>
-							Log out
-						</button>
-					)
-				}
-			</div>
-		</header>
+								Log out
+							</button>
+						)
+					}
+				</div>
+			</header>
+			{
+				loggedIn && (
+					<nav aria-label="Admin" class="px-4">
+						<div class="flex gap-1 overflow-x-auto">
+							{tabs.map((tab) => (
+								<a
+									aria-current={tab.current ? "page" : undefined}
+									class:list={[
+										"relative shrink-0 px-3 py-2 text-sm transition-colors duration-200",
+										tab.current
+											? "text-[var(--primary)]"
+											: "text-[var(--btn-content)] hover:text-[var(--primary)]",
+									]}
+									href={tab.href}
+								>
+									{tab.label}
+									{tab.current && (
+										<span class="admin-tab-ink absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-[var(--primary)]" />
+									)}
+								</a>
+							))}
+						</div>
+					</nav>
+				)
+			}
+		</div>
 		<main
 			class:list={[
+				"admin-main",
 				center
 					? "flex min-h-[calc(100vh-4.5rem)] items-center justify-center p-4"
 					: "mx-auto max-w-4xl space-y-6 p-4",
@@ -126,17 +152,89 @@ const configHue = siteConfig.themeColor.hue;
 		>
 			<slot />
 		</main>
-		{
-			loggedIn && (
-				<script is:inline>
-					document
-						.getElementById("admin-logout")
-						.addEventListener("click", async () => {
-							await fetch("/api/auth/logout", { method: "POST" });
-							location.assign("/admin/login");
-						});
-				</script>
-			)
-		}
+		<p
+			class="pointer-events-none fixed left-1/2 top-4 z-50 max-w-[min(24rem,calc(100%-2rem))] -translate-x-1/2 rounded-lg px-4 py-2 text-center text-sm text-white opacity-0 shadow-lg transition-opacity duration-200"
+			id="admin-toast"
+			role="status"
+		>
+		</p>
+		<script is:inline>
+			const toastEl = document.getElementById("admin-toast");
+			let toastTimer;
+			function adminToast(ok, message) {
+				if (!toastEl) {
+					return;
+				}
+				toastEl.textContent = message;
+				toastEl.style.backgroundColor = ok ? "#16a34a" : "#dc2626";
+				toastEl.classList.remove("opacity-0");
+				clearTimeout(toastTimer);
+				toastTimer = setTimeout(() => {
+					toastEl.classList.add("opacity-0");
+				}, 2000);
+			}
+			window.adminToast = adminToast;
+			// Survives the post-create redirect so the toast can show on the edit page.
+			window.queueAdminToast = (ok, message) => {
+				sessionStorage.setItem(
+					"admin-toast",
+					JSON.stringify({ ok, message }),
+				);
+			};
+			try {
+				const raw = sessionStorage.getItem("admin-toast");
+				if (raw) {
+					sessionStorage.removeItem("admin-toast");
+					const pending = JSON.parse(raw);
+					adminToast(Boolean(pending.ok), String(pending.message ?? ""));
+				}
+			} catch {
+				sessionStorage.removeItem("admin-toast");
+			}
+			document
+				.querySelector("nav[aria-label='Admin'] a[aria-current='page']")
+				?.addEventListener("click", (event) => {
+					event.preventDefault();
+				});
+			document
+				.getElementById("admin-logout")
+				?.addEventListener("click", async () => {
+					await fetch("/api/auth/logout", { method: "POST" });
+					location.assign("/admin/login");
+				});
+		</script>
+		<style is:global>
+			@view-transition {
+				navigation: auto;
+			}
+			.admin-chrome {
+				view-transition-name: admin-chrome;
+			}
+			.admin-main {
+				view-transition-name: admin-panel;
+				animation: admin-panel-in 0.28s ease;
+			}
+			.admin-tab-ink {
+				view-transition-name: admin-tab-ink;
+			}
+			@keyframes admin-panel-in {
+				from {
+					opacity: 0;
+					transform: translateX(0.75rem);
+				}
+				to {
+					opacity: 1;
+					transform: none;
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				@view-transition {
+					navigation: none;
+				}
+				.admin-main {
+					animation: none;
+				}
+			}
+		</style>
 	</body>
 </html>

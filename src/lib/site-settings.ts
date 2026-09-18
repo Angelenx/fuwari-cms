@@ -1,19 +1,41 @@
 import { env } from "cloudflare:workers";
 import { profileConfig, siteConfig } from "../config";
+import { parseLocale, type UiLocale } from "../i18n/locale";
 import type { ProfileConfig, SiteConfig } from "../types/config";
 
 /**
- * Public appearance (sidebar profile + home banner) stored as one D1 row.
+ * Public appearance stored as one D1 row (profile, banner, site identity, about).
  * Missing row or blank fields overlay `src/config.ts` so the live frontend
  * values stay the defaults until something is saved.
  */
 
 export type BannerSettings = SiteConfig["banner"];
 
+export type SiteIdentity = {
+	title: string;
+	subtitle: string;
+	footer: string;
+	lang: UiLocale;
+};
+
+export type AboutContent = {
+	md: string;
+	html: string;
+};
+
 export type SiteSettings = {
 	profile: ProfileConfig;
 	banner: BannerSettings;
+	site: SiteIdentity;
+	about: AboutContent;
 };
+
+/** Matches the previous hardcoded about page until `/admin/about` is saved. */
+export const DEFAULT_ABOUT_MD =
+	"This is the about page. It will be editable from `/admin` once the data layer lands.";
+
+export const DEFAULT_ABOUT_HTML =
+	"<p>This is the about page. It will be editable from <code>/admin</code> once the data layer lands.</p>";
 
 export type SiteSettingsWrite = {
 	avatar: string;
@@ -32,15 +54,35 @@ export type SiteSettingsWrite = {
 	};
 };
 
+export type SiteIdentityWrite = {
+	title: string;
+	subtitle: string;
+	footer: string;
+	lang: UiLocale;
+};
+
+export type AboutWrite = {
+	bodyMd: string;
+	bodyHtml: string;
+};
+
 type SettingsRow = {
 	avatar: string | null;
 	name: string | null;
 	bio: string | null;
 	links_json: string | null;
 	banner_json: string | null;
+	title: string | null;
+	subtitle: string | null;
+	footer: string | null;
+	lang: string | null;
+	about_md: string | null;
+	about_html: string | null;
 };
-
 const NAME_MAX = 80;
+const TITLE_MAX = 80;
+const SUBTITLE_MAX = 120;
+const FOOTER_MAX = 200;
 const BIO_MAX = 500;
 const URL_MAX = 2048;
 const CREDIT_MAX = 200;
@@ -155,8 +197,30 @@ function mergeBanner(raw: unknown): BannerSettings {
 	};
 }
 
+function defaultFooter(title: string): string {
+	return `Powered by Astro & ${title}`;
+}
+
+function mergeIdentity(row: SettingsRow | null): SiteIdentity {
+	const title = nonempty(row?.title) ?? siteConfig.title;
+	return {
+		title,
+		subtitle: nonempty(row?.subtitle) ?? siteConfig.subtitle,
+		footer: nonempty(row?.footer) ?? defaultFooter(title),
+		lang: parseLocale(row?.lang) ?? parseLocale(siteConfig.lang) ?? "en",
+	};
+}
+
+function mergeAbout(row: SettingsRow | null): AboutContent {
+	return {
+		md: nonempty(row?.about_md) ?? DEFAULT_ABOUT_MD,
+		html: nonempty(row?.about_html) ?? DEFAULT_ABOUT_HTML,
+	};
+}
+
 function mergeRow(row: SettingsRow | null): SiteSettings {
 	if (!row) {
+		const site = mergeIdentity(null);
 		return {
 			profile: {
 				...profileConfig,
@@ -166,6 +230,8 @@ function mergeRow(row: SettingsRow | null): SiteSettings {
 				...siteConfig.banner,
 				credit: { ...siteConfig.banner.credit },
 			},
+			site,
+			about: mergeAbout(null),
 		};
 	}
 	return {
@@ -176,13 +242,16 @@ function mergeRow(row: SettingsRow | null): SiteSettings {
 			links: mergeLinks(parseJson(row.links_json)),
 		},
 		banner: mergeBanner(parseJson(row.banner_json)),
+		site: mergeIdentity(row),
+		about: mergeAbout(row),
 	};
 }
 
-/** Effective profile + banner after overlaying D1 on `src/config.ts`. */
+/** Effective profile, banner, identity, and about after overlaying D1 on `src/config.ts`. */
 export async function getSiteSettings(): Promise<SiteSettings> {
 	const row = await env.DB.prepare(
-		`SELECT avatar, name, bio, links_json, banner_json
+		`SELECT avatar, name, bio, links_json, banner_json,
+			title, subtitle, footer, lang, about_md, about_html
 		 FROM site_settings WHERE id = 1`,
 	).first<SettingsRow>();
 	return mergeRow(row);
@@ -313,6 +382,85 @@ export async function upsertSiteSettings(
 			updated_at = excluded.updated_at`,
 	)
 		.bind(input.avatar, input.name, input.bio, linksJson, bannerJson)
+		.run();
+	return getSiteSettings();
+}
+
+/** Trust-boundary parse for PUT /api/admin/site. */
+export function parseSiteIdentityInput(
+	body: unknown,
+): SiteIdentityWrite | { error: string } {
+	if (!asRecord(body)) {
+		return { error: "Invalid body" };
+	}
+	const title = nonempty(body.title);
+	if (!title || title.length > TITLE_MAX) {
+		return { error: "Invalid title" };
+	}
+	if (
+		typeof body.subtitle !== "string" ||
+		body.subtitle.length > SUBTITLE_MAX
+	) {
+		return { error: "Invalid subtitle" };
+	}
+	if (typeof body.footer !== "string" || body.footer.length > FOOTER_MAX) {
+		return { error: "Invalid footer" };
+	}
+	const lang = parseLocale(
+		typeof body.lang === "string" ? body.lang : undefined,
+	);
+	if (!lang) {
+		return { error: "Invalid lang" };
+	}
+	return {
+		title,
+		subtitle: body.subtitle.trim(),
+		footer: body.footer.trim(),
+		lang,
+	};
+}
+
+export async function upsertSiteIdentity(
+	input: SiteIdentityWrite,
+): Promise<SiteSettings> {
+	await env.DB.prepare(
+		`INSERT INTO site_settings (id, title, subtitle, footer, lang, updated_at)
+		 VALUES (1, ?, ?, ?, ?, datetime('now'))
+		 ON CONFLICT(id) DO UPDATE SET
+			title = excluded.title,
+			subtitle = excluded.subtitle,
+			footer = excluded.footer,
+			lang = excluded.lang,
+			updated_at = excluded.updated_at`,
+	)
+		.bind(input.title, input.subtitle, input.footer, input.lang)
+		.run();
+	return getSiteSettings();
+}
+
+/** Trust-boundary parse for PUT /api/admin/about. */
+export function parseAboutInput(
+	body: unknown,
+): { bodyMd: string } | { error: string } {
+	if (!asRecord(body)) {
+		return { error: "Invalid body" };
+	}
+	if (typeof body.bodyMd !== "string") {
+		return { error: "Invalid bodyMd" };
+	}
+	return { bodyMd: body.bodyMd };
+}
+
+export async function upsertAbout(input: AboutWrite): Promise<SiteSettings> {
+	await env.DB.prepare(
+		`INSERT INTO site_settings (id, about_md, about_html, updated_at)
+		 VALUES (1, ?, ?, datetime('now'))
+		 ON CONFLICT(id) DO UPDATE SET
+			about_md = excluded.about_md,
+			about_html = excluded.about_html,
+			updated_at = excluded.updated_at`,
+	)
+		.bind(input.bodyMd, input.bodyHtml)
 		.run();
 	return getSiteSettings();
 }

@@ -1,0 +1,108 @@
+---
+import { env } from "cloudflare:workers";
+import AdminChrome from "@components/admin/AdminChrome.astro";
+import { getSessionFromRequest } from "@lib/auth/session";
+import { getSiteSettings } from "@lib/site-settings";
+
+const user = await getSessionFromRequest(Astro.request, env);
+if (!user) {
+	return Astro.redirect("/admin/login");
+}
+
+const { about } = await getSiteSettings();
+---
+
+<AdminChrome loggedIn title="About">
+	<form class="card-base space-y-3 p-6" id="about-form">
+		<label class="block text-sm">
+			Markdown
+			<textarea
+				class="mt-1 min-h-64 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2 font-mono text-sm"
+				name="bodyMd"
+			>{about.md}</textarea>
+		</label>
+		<p class="hidden text-sm text-red-600" id="form-error"></p>
+		<div class="flex flex-wrap gap-2">
+			<button class="btn-regular rounded-lg px-3 py-2 text-sm" type="submit">
+				Save
+			</button>
+			<button
+				class="btn-regular rounded-lg px-3 py-2 text-sm"
+				id="preview-btn"
+				type="button"
+			>
+				Preview
+			</button>
+		</div>
+	</form>
+	<dialog
+		class="w-[min(48rem,calc(100%-2rem))] max-h-[80vh] overflow-auto rounded-[var(--radius-large)] border-0 bg-[var(--card-bg)] p-6 text-[var(--deep-text)] shadow-lg"
+		id="preview-dialog"
+	>
+		<div class="mb-4 flex items-center justify-between gap-3">
+			<h2 class="font-medium">Preview</h2>
+			<form method="dialog">
+				<button class="btn-regular rounded-lg px-3 py-1 text-sm" type="submit">
+					Close
+				</button>
+			</form>
+		</div>
+		<div
+			class="prose dark:prose-invert prose-base custom-md markdown-content !max-w-none"
+			id="preview"
+		>
+		</div>
+	</dialog>
+	<script is:inline>
+		const form = document.getElementById("about-form");
+		const errorEl = document.getElementById("form-error");
+		const dialog = document.getElementById("preview-dialog");
+		dialog.addEventListener("click", (event) => {
+			if (event.target === dialog) {
+				dialog.close();
+			}
+		});
+		document.getElementById("preview-btn").addEventListener("click", async () => {
+			errorEl.classList.add("hidden");
+			const bodyMd = new FormData(form).get("bodyMd") ?? "";
+			const res = await fetch("/api/admin/preview", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ body_md: bodyMd }),
+			});
+			if (!res.ok) {
+				errorEl.textContent = "Could not render preview.";
+				errorEl.classList.remove("hidden");
+				return;
+			}
+			const body = await res.json();
+			document.getElementById("preview").innerHTML = body.bodyHtml ?? "";
+			dialog.showModal();
+		});
+		form.addEventListener("submit", async (event) => {
+			event.preventDefault();
+			errorEl.classList.add("hidden");
+			const res = await fetch("/api/admin/about", {
+				method: "PUT",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					bodyMd: new FormData(form).get("bodyMd") ?? "",
+				}),
+			});
+			const body = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				window.adminToast(
+					false,
+					typeof body.error === "string" ? body.error : "Could not save.",
+				);
+				return;
+			}
+			window.adminToast(true, "Saved.");
+		});
+	</script>
+	<style>
+		#preview-dialog::backdrop {
+			background: rgb(0 0 0 / 0.4);
+		}
+	</style>
+</AdminChrome>

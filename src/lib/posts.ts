@@ -1,14 +1,12 @@
 import { env } from "cloudflare:workers";
 import type { MarkdownHeading } from "astro";
 import type { PostEntry } from "@/types/post";
+import { getSiteSettings } from "./site-settings";
 
 /**
  * Post repository backed by D1. Public-facing functions never return drafts:
  * every SELECT includes `status = 'published'`.
  */
-
-const ABOUT_HTML =
-	"<p>This is the about page. It will be editable from <code>/admin</code> once the data layer lands.</p>";
 
 type PostRow = {
 	id: number;
@@ -147,5 +145,9 @@ export async function getPublishedPost(
 
 /** Rendered HTML of a standalone page such as `about`. */
 export async function getSpecPageHtml(name: "about"): Promise<string> {
-	return name === "about" ? ABOUT_HTML : "";
+	if (name !== "about") {
+		return "";
+	}
+	const { about } = await getSiteSettings();
+	return about.html;
 }

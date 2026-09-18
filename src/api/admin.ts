@@ -11,7 +11,11 @@ import { getSession } from "../lib/auth/session";
 import { renderMarkdown } from "../lib/markdown";
 import {
 	getSiteSettings,
+	parseAboutInput,
+	parseSiteIdentityInput,
 	parseSiteSettingsInput,
+	upsertAbout,
+	upsertSiteIdentity,
 	upsertSiteSettings,
 } from "../lib/site-settings";
 import type { AppEnv } from "./env";
@@ -303,6 +307,46 @@ export const admin = new Hono<AppEnv>()
 			return c.json({ error: parsed.error }, 400);
 		}
 		return c.json(await upsertSiteSettings(parsed));
+	})
+	.get("/site", async (c) => {
+		const { site } = await getSiteSettings();
+		return c.json({ site });
+	})
+	.put("/site", async (c) => {
+		let body: unknown;
+		try {
+			body = await c.req.json();
+		} catch {
+			return c.json({ error: "Invalid JSON" }, 400);
+		}
+		const parsed = parseSiteIdentityInput(body);
+		if ("error" in parsed) {
+			return c.json({ error: parsed.error }, 400);
+		}
+		const saved = await upsertSiteIdentity(parsed);
+		return c.json({ site: saved.site });
+	})
+	.get("/about", async (c) => {
+		const { about } = await getSiteSettings();
+		return c.json({ bodyMd: about.md, bodyHtml: about.html });
+	})
+	.put("/about", async (c) => {
+		let body: unknown;
+		try {
+			body = await c.req.json();
+		} catch {
+			return c.json({ error: "Invalid JSON" }, 400);
+		}
+		const parsed = parseAboutInput(body);
+		if ("error" in parsed) {
+			return c.json({ error: parsed.error }, 400);
+		}
+		const rendered = await renderMarkdown(parsed.bodyMd);
+		const saved = await upsertAbout({
+			bodyMd: parsed.bodyMd,
+			bodyHtml: rendered.bodyHtml,
+		});
+		return c.json({ bodyMd: saved.about.md, bodyHtml: saved.about.html });
 	})
 	.all("/ai/:name", (c) => c.json({ error: "Not Implemented" }, 501))
 	.route("/posts", posts)
