@@ -5,11 +5,12 @@ import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
 import { getPublishedPost } from "@lib/posts";
+import { getSiteSettings } from "@lib/site-settings";
 import { getPostUrlBySlug } from "@utils/url-utils";
 import { Icon } from "astro-icon/components";
 import ImageWrapper from "../../components/misc/ImageWrapper.astro";
 import PostMetadata from "../../components/PostMeta.astro";
-import { licenseConfig, profileConfig, siteConfig } from "../../config";
+import { licenseConfig, siteConfig } from "../../config";
 import { formatDateToYYYYMMDD } from "../../utils/date-utils";
 
 const slug = (Astro.params.slug ?? "").replace(/\/$/, "");
@@ -19,6 +20,7 @@ if (!entry) {
 }
 
 const { headings, words, minutes } = entry;
+const { profile } = await getSiteSettings();
 
 const jsonLd = {
 	"@context": "https://schema.org",
@@ -28,7 +30,7 @@ const jsonLd = {
 	keywords: entry.data.tags,
 	author: {
 		"@type": "Person",
-		name: profileConfig.name,
+		name: profile.name,
 		url: Astro.site,
 	},
 	datePublished: formatDateToYYYYMMDD(entry.data.published),

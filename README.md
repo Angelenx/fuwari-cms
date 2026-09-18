@@ -23,7 +23,7 @@ pnpm lint / pnpm format          # Biome
 pnpm test                        # wrangler types + Vitest（@cloudflare/vitest-plugin，跑在 workerd 内）
 ```
 
-首次打开 http://localhost:4321/admin/login 为用户名 `admin` 设密码（`users` 表为空时）。若本地还留着阶段 3 的种子管理员，先清空再走设密页：
+首次打开 http://localhost:4321/admin/login 为用户名 `admin` 设密码（`users` 表为空时）。登录后可在 `/admin/profile` 改头像、简介、三链和首页 banner（未写入 D1 的字段沿用 `src/config.ts`）。若本地还留着阶段 3 的种子管理员，先清空再走设密页：
 
 ```sh
 pnpm exec wrangler d1 execute fuwari-cms --local --command "DELETE FROM sessions; DELETE FROM users;"

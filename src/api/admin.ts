@@ -9,6 +9,11 @@ import {
 } from "../lib/admin-posts";
 import { getSession } from "../lib/auth/session";
 import { renderMarkdown } from "../lib/markdown";
+import {
+	getSiteSettings,
+	parseSiteSettingsInput,
+	upsertSiteSettings,
+} from "../lib/site-settings";
 import type { AppEnv } from "./env";
 
 /**
@@ -282,6 +287,22 @@ export const admin = new Hono<AppEnv>()
 			return c.json({ error: "Invalid body" }, 400);
 		}
 		return c.json(await renderMarkdown(markdown));
+	})
+	.get("/profile", async (c) => {
+		return c.json(await getSiteSettings());
+	})
+	.put("/profile", async (c) => {
+		let body: unknown;
+		try {
+			body = await c.req.json();
+		} catch {
+			return c.json({ error: "Invalid JSON" }, 400);
+		}
+		const parsed = parseSiteSettingsInput(body);
+		if ("error" in parsed) {
+			return c.json({ error: parsed.error }, 400);
+		}
+		return c.json(await upsertSiteSettings(parsed));
 	})
 	.all("/ai/:name", (c) => c.json({ error: "Not Implemented" }, 501))
 	.route("/posts", posts)

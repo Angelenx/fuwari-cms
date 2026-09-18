@@ -1,0 +1,142 @@
+---
+import ImageWrapper from "@components/misc/ImageWrapper.astro";
+import { getSiteSettings } from "@lib/site-settings";
+import { url } from "@utils/url-utils";
+import { siteConfig } from "@/config";
+import {
+	AUTO_MODE,
+	DARK_MODE,
+	DEFAULT_THEME,
+	LIGHT_MODE,
+} from "@/constants/constants";
+import "@fontsource/roboto/400.css";
+import "@fontsource/roboto/500.css";
+import "@fontsource/roboto/700.css";
+import "katex/dist/katex.css";
+import "@/styles/tailwind.css";
+import "@/styles/variables.styl";
+import "@/styles/markdown-extend.styl";
+
+interface Props {
+	title: string;
+	loggedIn?: boolean;
+	center?: boolean;
+}
+
+const { title, loggedIn = false, center = false } = Astro.props;
+const { profile } = await getSiteSettings();
+const configHue = siteConfig.themeColor.hue;
+---
+
+<html
+	class="bg-[var(--page-bg)] transition text-[14px] md:text-[16px]"
+	lang="en"
+	style={`--hue: ${configHue}`}
+>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>{title}</title>
+		<script
+			is:inline
+			define:vars={{
+				DEFAULT_THEME,
+				LIGHT_MODE,
+				DARK_MODE,
+				AUTO_MODE,
+				configHue,
+			}}
+		>
+			const theme = localStorage.getItem("theme") || DEFAULT_THEME;
+			switch (theme) {
+				case LIGHT_MODE:
+					document.documentElement.classList.remove("dark");
+					break;
+				case DARK_MODE:
+					document.documentElement.classList.add("dark");
+					break;
+				case AUTO_MODE:
+					if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+						document.documentElement.classList.add("dark");
+					} else {
+						document.documentElement.classList.remove("dark");
+					}
+			}
+			const hue = localStorage.getItem("hue") || configHue;
+			document.documentElement.style.setProperty("--hue", hue);
+		</script>
+	</head>
+	<body class="min-h-screen text-[var(--deep-text)]">
+		<header
+			class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line-color)] bg-[var(--card-bg)] px-4 py-3"
+		>
+			<div class="flex items-center gap-3 min-w-0">
+				<a
+					aria-label={`${profile.name} about page`}
+					class="h-10 w-10 shrink-0 overflow-hidden rounded-full"
+					href={url("/about/")}
+				>
+					<ImageWrapper
+						alt={`Profile image of ${profile.name}`}
+						class="h-10 w-10"
+						src={profile.avatar || ""}
+					/>
+				</a>
+				<div class="min-w-0">
+					<p class="truncate font-bold">{profile.name}</p>
+					<h1 class="truncate text-sm text-[var(--btn-content)]">{title}</h1>
+				</div>
+			</div>
+			<div class="flex flex-wrap items-center gap-2">
+				{
+					loggedIn && (
+						<>
+							<a class="btn-regular rounded-lg px-3 py-2 text-sm" href="/admin">
+								Posts
+							</a>
+							<a
+								class="btn-regular rounded-lg px-3 py-2 text-sm"
+								href="/admin/profile"
+							>
+								Profile
+							</a>
+						</>
+					)
+				}
+				<slot name="actions" />
+				{
+					loggedIn && (
+						<button
+							class="btn-regular rounded-lg px-3 py-2 text-sm"
+							id="admin-logout"
+							type="button"
+						>
+							Log out
+						</button>
+					)
+				}
+			</div>
+		</header>
+		<main
+			class:list={[
+				center
+					? "flex min-h-[calc(100vh-4.5rem)] items-center justify-center p-4"
+					: "mx-auto max-w-4xl space-y-6 p-4",
+			]}
+		>
+			<slot />
+		</main>
+		{
+			loggedIn && (
+				<script is:inline>
+					document
+						.getElementById("admin-logout")
+						.addEventListener("click", async () => {
+							await fetch("/api/auth/logout", { method: "POST" });
+							location.assign("/admin/login");
+						});
+				</script>
+			)
+		}
+	</body>
+</html>

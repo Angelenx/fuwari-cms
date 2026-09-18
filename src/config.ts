@@ -60,20 +60,18 @@ export const profileConfig: ProfileConfig = {
 	bio: "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
 	links: [
 		{
-			name: "Twitter",
-			icon: "fa6-brands:twitter", // Visit https://icones.js.org/ for icon codes
-			// You will need to install the corresponding icon set if it's not already included
-			// `pnpm add @iconify-json/<icon-set-name>`
-			url: "https://twitter.com",
+			name: "CSDN",
+			icon: "simple-icons:csdn",
+			url: "https://www.csdn.net",
 		},
 		{
-			name: "Steam",
-			icon: "fa6-brands:steam",
-			url: "https://store.steampowered.com",
+			name: "Bilibili",
+			icon: "simple-icons:bilibili",
+			url: "https://www.bilibili.com",
 		},
 		{
 			name: "GitHub",
-			icon: "fa6-brands:github",
+			icon: "simple-icons:github",
 			url: "https://github.com/saicaca/fuwari",
 		},
 	],

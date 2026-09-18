@@ -61,6 +61,15 @@ describe("admin post CRUD", () => {
 					body: '{"body_md":"x"}',
 				},
 			],
+			["/admin/profile", {}],
+			[
+				"/admin/profile",
+				{
+					method: "PUT",
+					headers: { "content-type": "application/json" },
+					body: "{}",
+				},
+			],
 			["/admin/posts/1", {}],
 			[
 				"/admin/posts/1",

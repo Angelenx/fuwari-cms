@@ -1,0 +1,195 @@
+---
+import { env } from "cloudflare:workers";
+import AdminChrome from "@components/admin/AdminChrome.astro";
+import ImageWrapper from "@components/misc/ImageWrapper.astro";
+import { getSessionFromRequest } from "@lib/auth/session";
+import { getSiteSettings } from "@lib/site-settings";
+
+const user = await getSessionFromRequest(Astro.request, env);
+if (!user) {
+	return Astro.redirect("/admin/login");
+}
+
+const { profile, banner } = await getSiteSettings();
+const [csdn, bilibili, github] = profile.links;
+---
+
+<AdminChrome loggedIn title="Profile">
+	<form class="card-base space-y-6 p-6" id="profile-form">
+		<section class="space-y-3">
+			<h2 class="text-lg font-medium">Profile</h2>
+			{
+				profile.avatar && (
+					<div class="h-24 w-24 overflow-hidden rounded-xl">
+						<ImageWrapper
+							alt={`Profile image of ${profile.name}`}
+							class="h-24 w-24"
+							src={profile.avatar}
+						/>
+					</div>
+				)
+			}
+			<label class="block text-sm">
+				Avatar URL
+				<input
+					class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+					name="avatar"
+					value={profile.avatar ?? ""}
+				/>
+			</label>
+			<label class="block text-sm">
+				Name
+				<input
+					class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+					name="name"
+					required
+					value={profile.name}
+				/>
+			</label>
+			<label class="block text-sm">
+				Bio
+				<textarea
+					class="mt-1 min-h-20 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+					name="bio"
+				>{profile.bio ?? ""}</textarea>
+			</label>
+			<label class="block text-sm">
+				CSDN URL
+				<input
+					class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+					name="link0"
+					value={csdn?.url ?? ""}
+				/>
+			</label>
+			<label class="block text-sm">
+				Bilibili URL
+				<input
+					class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+					name="link1"
+					value={bilibili?.url ?? ""}
+				/>
+			</label>
+			<label class="block text-sm">
+				GitHub URL
+				<input
+					class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+					name="link2"
+					value={github?.url ?? ""}
+				/>
+			</label>
+		</section>
+		<section class="space-y-3 border-t border-[var(--line-color)] pt-6">
+			<h2 class="text-lg font-medium">Banner</h2>
+			{
+				banner.enable && banner.src && (
+					<div class="h-24 w-full overflow-hidden rounded-xl">
+						<ImageWrapper
+							alt="Banner image of the blog"
+							class="h-24 w-full"
+							position={banner.position}
+							src={banner.src}
+						/>
+					</div>
+				)
+			}
+			<label class="flex items-center gap-2 text-sm">
+				<input checked={banner.enable} name="bannerEnable" type="checkbox" />
+				Show banner
+			</label>
+			<label class="block text-sm">
+				Banner URL
+				<input
+					class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+					name="bannerSrc"
+					value={banner.src}
+				/>
+			</label>
+			<label class="block text-sm">
+				Position
+				<select
+					class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+					name="bannerPosition"
+				>
+					<option selected={banner.position === "top"} value="top">
+						top
+					</option>
+					<option selected={(banner.position ?? "center") === "center"} value="center">
+						center
+					</option>
+					<option selected={banner.position === "bottom"} value="bottom">
+						bottom
+					</option>
+				</select>
+			</label>
+			<label class="flex items-center gap-2 text-sm">
+				<input
+					checked={banner.credit.enable}
+					name="creditEnable"
+					type="checkbox"
+				/>
+				Show credit
+			</label>
+			<label class="block text-sm">
+				Credit text
+				<input
+					class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+					name="creditText"
+					value={banner.credit.text}
+				/>
+			</label>
+			<label class="block text-sm">
+				Credit URL
+				<input
+					class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+					name="creditUrl"
+					value={banner.credit.url ?? ""}
+				/>
+			</label>
+		</section>
+		<p class="hidden text-sm text-red-600" id="form-error"></p>
+		<button class="btn-regular rounded-lg px-3 py-2 text-sm" type="submit">
+			Save
+		</button>
+	</form>
+	<script is:inline>
+		const form = document.getElementById("profile-form");
+		const errorEl = document.getElementById("form-error");
+		form.addEventListener("submit", async (event) => {
+			event.preventDefault();
+			errorEl.classList.add("hidden");
+			const data = new FormData(form);
+			const res = await fetch("/api/admin/profile", {
+				method: "PUT",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					avatar: data.get("avatar") ?? "",
+					name: data.get("name") ?? "",
+					bio: data.get("bio") ?? "",
+					links: [
+						{ url: data.get("link0") ?? "" },
+						{ url: data.get("link1") ?? "" },
+						{ url: data.get("link2") ?? "" },
+					],
+					banner: {
+						enable: form.elements.namedItem("bannerEnable").checked,
+						src: data.get("bannerSrc") ?? "",
+						position: data.get("bannerPosition"),
+						credit: {
+							enable: form.elements.namedItem("creditEnable").checked,
+							text: data.get("creditText") ?? "",
+							url: data.get("creditUrl") ?? "",
+						},
+					},
+				}),
+			});
+			const body = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				errorEl.textContent =
+					typeof body.error === "string" ? body.error : "Could not save.";
+				errorEl.classList.remove("hidden");
+				return;
+			}
+			location.assign("/admin/profile");
+		});
+	</script>
+</AdminChrome>

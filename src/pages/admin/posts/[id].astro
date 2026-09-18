@@ -1,9 +1,9 @@
 ---
 import { env } from "cloudflare:workers";
+import AdminChrome from "@components/admin/AdminChrome.astro";
 import PostEditor from "@components/admin/PostEditor.astro";
 import { getAdminPost } from "@lib/admin-posts";
 import { getSessionFromRequest } from "@lib/auth/session";
-import "@/styles/tailwind.css";
 
 const user = await getSessionFromRequest(Astro.request, env);
 if (!user) {
@@ -20,13 +20,6 @@ if (!post) {
 }
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>Edit {post.title}</title>
-	</head>
-	<body class="min-h-screen bg-zinc-100 text-zinc-900 p-4">
-		<PostEditor isNew={false} post={post} username={user.username} />
-	</body>
-</html>
+<AdminChrome loggedIn title={`Edit ${post.title}`}>
+	<PostEditor isNew={false} post={post} />
+</AdminChrome>

@@ -1,10 +1,10 @@
 ---
+import { getSiteSettings } from "@lib/site-settings";
 import { Icon } from "astro-icon/components";
-import { profileConfig } from "../../config";
 import { url } from "../../utils/url-utils";
 import ImageWrapper from "../misc/ImageWrapper.astro";
 
-const config = profileConfig;
+const { profile: config } = await getSiteSettings();
 ---
 <div class="card-base p-3">
     <a aria-label="Go to About Page" href={url('/about/')}

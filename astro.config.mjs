@@ -62,6 +62,8 @@ export default defineConfig({
 				"fa6-brands": ["*"],
 				"fa6-regular": ["*"],
 				"fa6-solid": ["*"],
+				// Monochrome brand marks so CSDN/Bilibili/GitHub inherit --hue / dark.
+				"simple-icons": ["csdn", "bilibili", "github"],
 			},
 		}),
 		// Replaces svelte.config.js; vitePreprocess is required for <style lang="stylus"> in theme components.

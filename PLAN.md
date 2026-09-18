@@ -188,6 +188,7 @@
 - [x] 编辑页：标题 / slug / 摘要 / 标签 / 封面 URL / 状态 / Markdown 大文本框 / 预览
 - [x] `POST /api/admin/ai/:name` 一律返回 `501`
 - [x] Vitest：CRUD 全流程 + 未登录调用全部 401；markdown 渲染单测
+- [x] `/admin/profile`：D1 `site_settings` 单行；头像 / 姓名 / 简介 / 三链 / banner 空字段回退 `src/config.ts` 当前前端值；社交图标 CSDN / Bilibili / GitHub（Simple Icons）
 
 **验收**：后台发布一篇文章，公开站刷新即见；撤回为草稿后公开站消失。 ✅ 2026-09-18
 

@@ -4,137 +4,131 @@ import type { AdminPost } from "@lib/admin-posts";
 interface Props {
 	isNew: boolean;
 	post?: AdminPost;
-	username: string;
 }
 
-const { isNew, post, username } = Astro.props;
+const { isNew, post } = Astro.props;
 ---
 
-<div class="mx-auto max-w-5xl space-y-6">
-	<header class="flex flex-wrap items-center justify-between gap-3">
-		<div>
-			<h1 class="text-lg font-medium">{isNew ? "New post" : "Edit post"}</h1>
-			<p class="text-sm text-zinc-600">
-				<a class="underline" href="/admin">All posts</a>
-				· {username}
-			</p>
-		</div>
+<p class="text-sm text-[var(--btn-content)]">
+	<a class="link text-[var(--primary)]" href="/admin">All posts</a>
+</p>
+<form class="space-y-3 card-base p-6" id="post-form">
+	<label class="block text-sm">
+		Title
+		<input
+			class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+			name="title"
+			required
+			value={post?.title ?? ""}
+		/>
+	</label>
+	<label class="block text-sm">
+		Slug
+		<input
+			class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2 font-mono text-sm"
+			name="slug"
+			pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+			required
+			value={post?.slug ?? ""}
+		/>
+	</label>
+	<label class="block text-sm">
+		Description
+		<input
+			class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+			name="description"
+			value={post?.description ?? ""}
+		/>
+	</label>
+	<label class="block text-sm">
+		Tags (comma separated)
+		<input
+			class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+			name="tags"
+			value={post?.tags.join(", ") ?? ""}
+		/>
+	</label>
+	<label class="block text-sm">
+		Category
+		<input
+			class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+			name="category"
+			value={post?.category ?? ""}
+		/>
+	</label>
+	<label class="block text-sm">
+		Cover URL
+		<input
+			class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+			name="coverUrl"
+			value={post?.coverUrl ?? ""}
+		/>
+	</label>
+	<label class="block text-sm">
+		Lang
+		<input
+			class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+			name="lang"
+			value={post?.lang ?? "en"}
+		/>
+	</label>
+	<label class="block text-sm">
+		Status
+		<select
+			class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+			name="status"
+		>
+			<option selected={post?.status !== "published"} value="draft">
+				draft
+			</option>
+			<option selected={post?.status === "published"} value="published">
+				published
+			</option>
+		</select>
+	</label>
+	<label class="block text-sm">
+		Markdown
+		<textarea
+			class="mt-1 min-h-64 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2 font-mono text-sm"
+			name="bodyMd"
+		>{post?.bodyMd ?? ""}</textarea>
+	</label>
+	<p class="hidden text-sm text-red-600" id="form-error"></p>
+	<div class="flex flex-wrap gap-2">
+		<button class="btn-regular rounded-lg px-3 py-2 text-sm" type="submit">
+			Save
+		</button>
 		<button
-			id="logout"
-			class="rounded border border-zinc-300 bg-white px-3 py-2 text-sm"
+			class="btn-regular rounded-lg px-3 py-2 text-sm"
+			id="preview-btn"
 			type="button"
 		>
-			Log out
+			Preview
 		</button>
-	</header>
-	<form id="post-form" class="grid gap-4 lg:grid-cols-2">
-		<div class="space-y-3 rounded-xl bg-white p-6 shadow">
-			<label class="block text-sm">
-				Title
-				<input
-					class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
-					name="title"
-					required
-					value={post?.title ?? ""}
-				/>
-			</label>
-			<label class="block text-sm">
-				Slug
-				<input
-					class="mt-1 w-full rounded border border-zinc-300 px-3 py-2 font-mono text-sm"
-					name="slug"
-					pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-					required
-					value={post?.slug ?? ""}
-				/>
-			</label>
-			<label class="block text-sm">
-				Description
-				<input
-					class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
-					name="description"
-					value={post?.description ?? ""}
-				/>
-			</label>
-			<label class="block text-sm">
-				Tags (comma separated)
-				<input
-					class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
-					name="tags"
-					value={post?.tags.join(", ") ?? ""}
-				/>
-			</label>
-			<label class="block text-sm">
-				Category
-				<input
-					class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
-					name="category"
-					value={post?.category ?? ""}
-				/>
-			</label>
-			<label class="block text-sm">
-				Cover URL
-				<input
-					class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
-					name="coverUrl"
-					value={post?.coverUrl ?? ""}
-				/>
-			</label>
-			<label class="block text-sm">
-				Lang
-				<input
-					class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
-					name="lang"
-					value={post?.lang ?? "en"}
-				/>
-			</label>
-			<label class="block text-sm">
-				Status
-				<select
-					class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
-					name="status"
-				>
-					<option selected={post?.status !== "published"} value="draft">
-						draft
-					</option>
-					<option selected={post?.status === "published"} value="published">
-						published
-					</option>
-				</select>
-			</label>
-			<label class="block text-sm">
-				Markdown
-				<textarea
-					class="mt-1 min-h-64 w-full rounded border border-zinc-300 px-3 py-2 font-mono text-sm"
-					name="bodyMd"
-				>{post?.bodyMd ?? ""}</textarea>
-			</label>
-			<p id="form-error" class="hidden text-sm text-red-600"></p>
-			<div class="flex flex-wrap gap-2">
-				<button
-					class="rounded bg-zinc-900 px-3 py-2 text-sm text-white"
-					type="submit"
-				>
-					Save
-				</button>
-				<button
-					class="rounded border border-zinc-300 px-3 py-2 text-sm"
-					id="preview-btn"
-					type="button"
-				>
-					Preview
-				</button>
-			</div>
-		</div>
-		<div class="rounded-xl bg-white p-6 shadow">
-			<h2 class="mb-3 text-sm font-medium text-zinc-500">Preview</h2>
-			<div id="preview" class="prose max-w-none text-sm"></div>
-		</div>
-	</form>
-</div>
+	</div>
+</form>
+<dialog
+	class="w-[min(48rem,calc(100%-2rem))] max-h-[80vh] overflow-auto rounded-[var(--radius-large)] border-0 bg-[var(--card-bg)] p-6 text-[var(--deep-text)] shadow-lg"
+	id="preview-dialog"
+>
+	<div class="mb-4 flex items-center justify-between gap-3">
+		<h2 class="font-medium">Preview</h2>
+		<form method="dialog">
+			<button class="btn-regular rounded-lg px-3 py-1 text-sm" type="submit">
+				Close
+			</button>
+		</form>
+	</div>
+	<div
+		class="prose dark:prose-invert prose-base custom-md markdown-content !max-w-none"
+		id="preview"
+	>
+	</div>
+</dialog>
 <script is:inline define:vars={{ isNew, postId: post?.id ?? null }}>
 	const form = document.getElementById("post-form");
 	const errorEl = document.getElementById("form-error");
+	const dialog = document.getElementById("preview-dialog");
 	const titleInput = form.elements.namedItem("title");
 	const slugInput = form.elements.namedItem("slug");
 	let slugTouched = !isNew;
@@ -170,23 +164,27 @@ const { isNew, post, username } = Astro.props;
 		};
 	}
 
-	async function preview() {
+	dialog.addEventListener("click", (event) => {
+		if (event.target === dialog) {
+			dialog.close();
+		}
+	});
+
+	document.getElementById("preview-btn").addEventListener("click", async () => {
+		errorEl.classList.add("hidden");
 		const res = await fetch("/api/admin/preview", {
 			method: "POST",
 			headers: { "content-type": "application/json" },
 			body: JSON.stringify({ body_md: payload().bodyMd }),
 		});
 		if (!res.ok) {
+			errorEl.textContent = "Could not render preview.";
+			errorEl.classList.remove("hidden");
 			return;
 		}
 		const body = await res.json();
 		document.getElementById("preview").innerHTML = body.bodyHtml ?? "";
-	}
-
-	document.getElementById("preview-btn").addEventListener("click", preview);
-	document.getElementById("logout").addEventListener("click", async () => {
-		await fetch("/api/auth/logout", { method: "POST" });
-		location.assign("/admin/login");
+		dialog.showModal();
 	});
 
 	form.addEventListener("submit", async (event) => {
@@ -208,3 +206,8 @@ const { isNew, post, username } = Astro.props;
 		location.assign(`/admin/posts/${body.post.id}`);
 	});
 </script>
+<style>
+	#preview-dialog::backdrop {
+		background: rgb(0 0 0 / 0.4);
+	}
+</style>
