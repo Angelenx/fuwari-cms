@@ -13,7 +13,15 @@ function runInlineScripts(root: ParentNode): void {
 		for (const attr of old.attributes) {
 			next.setAttribute(attr.name, attr.value);
 		}
-		next.textContent = old.textContent;
+		if (old.src) {
+			next.src = old.src;
+		} else {
+			const body = old.textContent ?? "";
+			// Classic `let`/`const` outlive the <script> node, so a later tab's
+			// `const form = ...` would throw without a fresh function scope.
+			next.textContent =
+				old.type === "module" ? body : `void function(){\n${body}\n}();`;
+		}
 		old.replaceWith(next);
 	}
 }
@@ -119,7 +127,11 @@ export function bootAdminChrome(): void {
 			return false;
 		}
 		panel.innerHTML = nextPanel.innerHTML;
-		runInlineScripts(panel);
+		try {
+			runInlineScripts(panel);
+		} catch {
+			return false;
+		}
 		const nextActions = doc.getElementById("admin-actions");
 		if (actions) {
 			actions.innerHTML = nextActions?.innerHTML ?? "";
@@ -199,6 +211,9 @@ export function bootAdminChrome(): void {
 	window.adminNavigate = (href: string) => navigate(href, true);
 
 	document.addEventListener("click", (event) => {
+		if (!isAdminAppPath(location.pathname)) {
+			return;
+		}
 		if (event.defaultPrevented || event.button !== 0) {
 			return;
 		}

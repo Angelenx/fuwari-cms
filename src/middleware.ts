@@ -1,4 +1,5 @@
 import { defineMiddleware } from "astro:middleware";
+import "./i18n/locale-als";
 import {
 	defaultLocale,
 	LOCALE_COOKIE,

@@ -19,6 +19,7 @@ import {
 import { defaultFavicons } from "../constants/icon";
 import { getUiLocale } from "../i18n/locale";
 import type { Favicon } from "../types/config";
+import { pathsEqual, url } from "../utils/url-utils";
 import "katex/dist/katex.css";
 // Fuwari only loads src/styles implicitly through ImageWrapper's `import.meta.glob("../../**")`.
 // That glob is narrowed to assets here, so the theme stylesheets are imported explicitly.

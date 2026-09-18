@@ -1,4 +1,3 @@
-import { AsyncLocalStorage } from "node:async_hooks";
 import { siteConfig } from "../config";
 
 /** Visitor UI locale. Content language on posts is separate. */
@@ -8,7 +7,19 @@ export type UiLocale = (typeof UI_LOCALES)[number];
 export const LOCALE_COOKIE = "locale";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
-const localeStore = new AsyncLocalStorage<UiLocale>();
+type LocaleAls = {
+	getStore(): UiLocale | undefined;
+	run<T>(locale: UiLocale, fn: () => T): T;
+};
+
+// Must not import `node:async_hooks` here: Navbar widgets and Layout's banner
+// script load this module in the browser.
+let localeAls: LocaleAls | undefined;
+
+/** Server-only. `src/i18n/locale-als.ts` installs ALS; the client leaves this unset. */
+export function installLocaleAls(store: LocaleAls): void {
+	localeAls = store;
+}
 
 export function parseLocale(
 	raw: string | undefined | null,
@@ -56,7 +67,7 @@ export function getUiLocale(): UiLocale {
 	const htmlLang =
 		typeof document !== "undefined" ? document.documentElement.lang : undefined;
 	return (
-		localeStore.getStore() ??
+		localeAls?.getStore() ??
 		parseLocale(cookieValue(LOCALE_COOKIE)) ??
 		parseLocale(htmlLang) ??
 		defaultLocale()
@@ -64,7 +75,7 @@ export function getUiLocale(): UiLocale {
 }
 
 export function runWithLocale<T>(locale: UiLocale, fn: () => T): T {
-	return localeStore.run(locale, fn);
+	return localeAls ? localeAls.run(locale, fn) : fn();
 }
 
 export function otherLocale(locale: UiLocale): UiLocale {
