@@ -7,7 +7,7 @@ function pageKey(href: string): string {
 	return `${normalizeAdminPath(url.pathname)}${url.search}`;
 }
 
-function runInlineScripts(root: ParentNode): void {
+function runInlineScripts(root: HTMLElement): void {
 	for (const old of [...root.querySelectorAll("script")]) {
 		const next = document.createElement("script");
 		for (const attr of old.attributes) {
@@ -76,14 +76,18 @@ export function bootAdminChrome(): void {
 			location.assign("/admin/login");
 		});
 
-	const nav = document.querySelector<HTMLElement>("nav[aria-label='Admin']");
-	const panel = document.getElementById("admin-panel");
-	const loading = document.getElementById("admin-loading");
+	const navEl = document.querySelector<HTMLElement>("nav[aria-label='Admin']");
+	const panelEl = document.getElementById("admin-panel");
+	const loadingEl = document.getElementById("admin-loading");
 	const actions = document.getElementById("admin-actions");
 	const titleEl = document.getElementById("admin-header-title");
-	if (!nav || !panel || !loading) {
+	if (!navEl || !panelEl || !loadingEl) {
 		return;
 	}
+	// Rebind so nested listeners see HTMLElement, not HTMLElement | null.
+	const nav: HTMLElement = navEl;
+	const panel: HTMLElement = panelEl;
+	const loading: HTMLElement = loadingEl;
 
 	let navAbort: AbortController | null = null;
 	let navGen = 0;
