@@ -4,6 +4,10 @@ declare global {
 	interface Window {
 		// type from '@swup/astro' is incorrect
 		swup: AstroIntegration;
+		adminToast?: (ok: boolean, message: string) => void;
+		queueAdminToast?: (ok: boolean, message: string) => void;
+		adminNavigate?: (href: string) => Promise<void>;
+		__adminChromeBooted?: boolean;
 		pagefind: {
 			search: (query: string) => Promise<{
 				results: Array<{

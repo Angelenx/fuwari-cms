@@ -205,8 +205,14 @@ const { isNew, post } = Astro.props;
 			return;
 		}
 		if (isNew) {
-			window.queueAdminToast(true, "Saved.");
-			location.assign(`/admin/posts/${body.post.id}`);
+			window.adminToast(true, "Saved.");
+			const dest = `/admin/posts/${body.post.id}`;
+			if (window.adminNavigate) {
+				void window.adminNavigate(dest);
+			} else {
+				window.queueAdminToast?.(true, "Saved.");
+				location.assign(dest);
+			}
 			return;
 		}
 		window.adminToast(true, "Saved.");

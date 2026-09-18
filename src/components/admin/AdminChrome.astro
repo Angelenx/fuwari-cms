@@ -1,5 +1,6 @@
 ---
 import ImageWrapper from "@components/misc/ImageWrapper.astro";
+import { adminTabHref } from "@lib/admin-nav";
 import { getSiteSettings } from "@lib/site-settings";
 import { url } from "@utils/url-utils";
 import { siteConfig } from "@/config";
@@ -26,20 +27,21 @@ interface Props {
 const { title, loggedIn = false, center = false } = Astro.props;
 const { profile } = await getSiteSettings();
 const configHue = siteConfig.themeColor.hue;
-const path = Astro.url.pathname.replace(/\/+$/, "") || "/";
+const path = Astro.url.pathname;
+const currentTab = adminTabHref(path);
 const tabs = [
-	{
-		href: "/admin",
-		label: "Posts",
-		current: path === "/admin" || path.startsWith("/admin/posts"),
-	},
+	{ href: "/admin", label: "Posts", current: currentTab === "/admin" },
 	{
 		href: "/admin/profile",
 		label: "Profile",
-		current: path === "/admin/profile",
+		current: currentTab === "/admin/profile",
 	},
-	{ href: "/admin/site", label: "Site", current: path === "/admin/site" },
-	{ href: "/admin/about", label: "About", current: path === "/admin/about" },
+	{ href: "/admin/site", label: "Site", current: currentTab === "/admin/site" },
+	{
+		href: "/admin/about",
+		label: "About",
+		current: currentTab === "/admin/about",
+	},
 ];
 ---
 
@@ -98,11 +100,18 @@ const tabs = [
 					</a>
 					<div class="min-w-0">
 						<p class="truncate font-bold">{profile.name}</p>
-						<h1 class="truncate text-sm text-[var(--btn-content)]">{title}</h1>
+						<h1
+							class="truncate text-sm text-[var(--btn-content)]"
+							id="admin-header-title"
+						>
+							{title}
+						</h1>
 					</div>
 				</div>
 				<div class="flex flex-wrap items-center gap-2">
-					<slot name="actions" />
+					<div class="flex flex-wrap items-center gap-2" id="admin-actions">
+						<slot name="actions" />
+					</div>
 					{
 						loggedIn && (
 							<button
@@ -123,18 +132,9 @@ const tabs = [
 							{tabs.map((tab) => (
 								<a
 									aria-current={tab.current ? "page" : undefined}
-									class:list={[
-										"relative shrink-0 px-3 py-2 text-sm transition-colors duration-200",
-										tab.current
-											? "text-[var(--primary)]"
-											: "text-[var(--btn-content)] hover:text-[var(--primary)]",
-									]}
 									href={tab.href}
 								>
 									{tab.label}
-									{tab.current && (
-										<span class="admin-tab-ink absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-[var(--primary)]" />
-									)}
 								</a>
 							))}
 						</div>
@@ -150,7 +150,19 @@ const tabs = [
 					: "mx-auto max-w-4xl space-y-6 p-4",
 			]}
 		>
-			<slot />
+			<div class="admin-loading" hidden id="admin-loading">
+				<div class="admin-loader" aria-label="Loading" role="status">
+					<span></span>
+					<span></span>
+					<span></span>
+				</div>
+			</div>
+			<div
+				class:list={["admin-panel", center && "w-full max-w-sm"]}
+				id="admin-panel"
+			>
+				<slot />
+			</div>
 		</main>
 		<p
 			class="pointer-events-none fixed left-1/2 top-4 z-50 max-w-[min(24rem,calc(100%-2rem))] -translate-x-1/2 rounded-lg px-4 py-2 text-center text-sm text-white opacity-0 shadow-lg transition-opacity duration-200"
@@ -158,64 +170,80 @@ const tabs = [
 			role="status"
 		>
 		</p>
-		<script is:inline>
-			const toastEl = document.getElementById("admin-toast");
-			let toastTimer;
-			function adminToast(ok, message) {
-				if (!toastEl) {
-					return;
-				}
-				toastEl.textContent = message;
-				toastEl.style.backgroundColor = ok ? "#16a34a" : "#dc2626";
-				toastEl.classList.remove("opacity-0");
-				clearTimeout(toastTimer);
-				toastTimer = setTimeout(() => {
-					toastEl.classList.add("opacity-0");
-				}, 2000);
-			}
-			window.adminToast = adminToast;
-			// Survives the post-create redirect so the toast can show on the edit page.
-			window.queueAdminToast = (ok, message) => {
-				sessionStorage.setItem(
-					"admin-toast",
-					JSON.stringify({ ok, message }),
-				);
-			};
-			try {
-				const raw = sessionStorage.getItem("admin-toast");
-				if (raw) {
-					sessionStorage.removeItem("admin-toast");
-					const pending = JSON.parse(raw);
-					adminToast(Boolean(pending.ok), String(pending.message ?? ""));
-				}
-			} catch {
-				sessionStorage.removeItem("admin-toast");
-			}
-			document
-				.querySelector("nav[aria-label='Admin'] a[aria-current='page']")
-				?.addEventListener("click", (event) => {
-					event.preventDefault();
-				});
-			document
-				.getElementById("admin-logout")
-				?.addEventListener("click", async () => {
-					await fetch("/api/auth/logout", { method: "POST" });
-					location.assign("/admin/login");
-				});
+		<script>
+			import { bootAdminChrome } from "@lib/admin-chrome";
+			bootAdminChrome();
 		</script>
 		<style is:global>
-			@view-transition {
-				navigation: auto;
+			nav[aria-label="Admin"] a {
+				position: relative;
+				flex-shrink: 0;
+				padding: 0.5rem 0.75rem;
+				color: var(--btn-content);
+				font-size: 0.875rem;
+				transition: color 0.2s ease;
 			}
-			.admin-chrome {
-				view-transition-name: admin-chrome;
+			nav[aria-label="Admin"] a:hover,
+			nav[aria-label="Admin"] a[aria-current="page"] {
+				color: var(--primary);
 			}
-			.admin-main {
-				view-transition-name: admin-panel;
+			nav[aria-label="Admin"] a::after {
+				content: "";
+				position: absolute;
+				right: 0.75rem;
+				bottom: 0;
+				left: 0.75rem;
+				height: 2px;
+				border-radius: 999px;
+				background: var(--primary);
+				transform: scaleX(0);
+				transition: transform 0.2s ease;
+			}
+			nav[aria-label="Admin"] a[aria-current="page"]::after {
+				transform: scaleX(1);
+			}
+			.admin-loading:not([hidden]) {
+				display: flex;
+				min-height: 12rem;
+				align-items: center;
+				justify-content: center;
+			}
+			.admin-loader {
+				display: flex;
+				align-items: center;
+				gap: 0.4rem;
+				padding: 0.7rem 1.15rem;
+				border-radius: 999px;
+				background: var(--btn-regular-bg);
+			}
+			.admin-loader span {
+				display: block;
+				width: 0.5rem;
+				height: 0.5rem;
+				border-radius: 999px;
+				background: var(--primary);
+				animation: admin-loader-dot 0.9s ease-in-out infinite;
+			}
+			.admin-loader span:nth-child(2) {
+				animation-delay: 0.15s;
+			}
+			.admin-loader span:nth-child(3) {
+				animation-delay: 0.3s;
+			}
+			@keyframes admin-loader-dot {
+				0%,
+				80%,
+				100% {
+					opacity: 0.35;
+					transform: translateY(0);
+				}
+				40% {
+					opacity: 1;
+					transform: translateY(-0.28rem);
+				}
+			}
+			.admin-panel-in {
 				animation: admin-panel-in 0.28s ease;
-			}
-			.admin-tab-ink {
-				view-transition-name: admin-tab-ink;
 			}
 			@keyframes admin-panel-in {
 				from {
@@ -228,11 +256,11 @@ const tabs = [
 				}
 			}
 			@media (prefers-reduced-motion: reduce) {
-				@view-transition {
-					navigation: none;
-				}
-				.admin-main {
+				nav[aria-label="Admin"] a::after,
+				.admin-loader span,
+				.admin-panel-in {
 					animation: none;
+					transition: none;
 				}
 			}
 		</style>

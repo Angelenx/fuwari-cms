@@ -98,10 +98,14 @@ const posts = await listAdminPosts();
 						method: "DELETE",
 					});
 					if (!res.ok) {
-						alert("Could not delete.");
+						window.adminToast?.(false, "Could not delete.");
 						return;
 					}
-					location.reload();
+					if (window.adminNavigate) {
+						void window.adminNavigate("/admin");
+					} else {
+						location.reload();
+					}
 					return;
 				}
 				const status =
@@ -114,10 +118,14 @@ const posts = await listAdminPosts();
 					body: JSON.stringify({ status }),
 				});
 				if (!res.ok) {
-					alert("Could not update status.");
+					window.adminToast?.(false, "Could not update status.");
 					return;
 				}
-				location.reload();
+				if (window.adminNavigate) {
+					void window.adminNavigate("/admin");
+				} else {
+					location.reload();
+				}
 			});
 		});
 	</script>
