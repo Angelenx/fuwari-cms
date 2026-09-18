@@ -155,18 +155,22 @@
 
 ## 阶段 3 · 鉴权与 Session
 
-**目标**：能登录、能登出、未登录访问 `/admin` 与 `/api/admin/*` 被拒。
+**目标**：能登录、能登出、未登录访问 `/admin` 与 `/api/admin/*` 被拒。本阶段不写文章 CRUD。
 
-**参考文档：** [Web Crypto](https://developers.cloudflare.com/workers/runtime-apis/web-crypto/)、[Hono Cookie](https://hono.dev/docs/helpers/cookie)、[Hono Middleware](https://hono.dev/docs/guides/middleware)、[Advanced routing 示例](https://docs.astro.build/en/guides/routing/)、[Secrets](https://developers.cloudflare.com/workers/configuration/secrets/)
+**参考文档：** [Web Crypto](https://developers.cloudflare.com/workers/runtime-apis/web-crypto/)（PBKDF2 / `deriveBits` / `timingSafeEqual`）、[Hono Cookie](https://hono.dev/docs/helpers/cookie)（`setSignedCookie`）、[Hono Middleware](https://hono.dev/docs/guides/middleware)、[Advanced routing 示例](https://github.com/withastro/astro/blob/main/examples/advanced-routing/src/fetch.ts)、[Secrets](https://developers.cloudflare.com/workers/configuration/secrets/)
 
-- [ ] `src/lib/auth/password.ts`：PBKDF2-SHA256（Web Crypto）hash / verify
-- [ ] `src/lib/auth/session.ts`：随机 token 入 `sessions`；Cookie 用 `hono/cookie`，属性 `HttpOnly; Secure; SameSite=Lax; Path=/`
-- [ ] Hono 路由：`POST /api/auth/login`、`POST /api/auth/logout`、`GET /api/auth/me`
-- [ ] `/api/admin/*` 由 Hono 鉴权中间件覆盖；`/admin/*` 守卫放在 `src/fetch.ts` 的 Hono 中间件（与 Astro advanced-routing 示例相同，未登录重定向 `/admin/login`）
-- [ ] 登录限速（按 IP，内存或 D1 计数，`ponytail:` 注明上限）
-- [ ] 过期 session 清理（登录时顺带 `DELETE ... WHERE expires_at < now`）
+- [x] `src/lib/auth/password.ts`：Web Crypto PBKDF2-SHA256，`deriveBits(256)`，盐 16 字节，迭代 **100000**（`ponytail:` Workers SubtleCrypto 天花板，只改这一处）。存储 `pbkdf2$sha256$100000$<b64url-salt>$<b64url-dk>`。比对用 `crypto.subtle.timingSafeEqual`。用户不存在时 `verifyPassword(password, undefined)` 仍跑一次假 hash，避免按耗时枚举用户名
+- [x] `src/lib/auth/session.ts`：32 字节 hex 作 `sessions.id`，TTL 7 天（SQL `datetime('now', '+7 days')`）。Cookie 名 `sid`，`hono/cookie` 的 HMAC 签名（`SESSION_SECRET`）；`HttpOnly; SameSite=Lax; Path=/`；**仅 HTTPS 时 Secure**（本地 HTTP 否则丢 Cookie）。`SESSION_SECRET` 不当密码胡椒。绑定走 `import { env } from "cloudflare:workers"`（Astro 调 `Hono.fetch(request)` 时 `c.env` 为空；与 `posts.ts` 相同）
+- [x] Hono（`src/api/auth.ts`，`Bindings: Cloudflare.Env`）：`POST /api/auth/login`、`POST /api/auth/logout`（无 Cookie 也 204）、`GET /api/auth/me`。错密码统一 `"Invalid credentials"` 且不 Set-Cookie
+- [x] `src/api/admin.ts`：`use("*", requireAuth)` → 401 JSON。本阶段 `GET /api/admin/ping` 作可测靶子；未登录访问任意 `/api/admin/*` 都是 401，不先 404
+- [x] `src/fetch.ts` 在 `pages()` 之前守卫 `/admin`（对齐官方 advanced-routing 示例）：无有效 D1 session → `302 /admin/login`；已登录访问登录页 → `302 /admin`。校验走 D1，不只看 Cookie 是否存在
+- [x] 素页面：`/admin/login`（`fetch` + `location.assign`，避开 Swup）、`/admin` stub（当前用户 + 登出；阶段 4 换成文章列表）
+- [x] 登录限速：按 `CF-Connecting-IP` 的内存 Map，15 分钟 5 次失败 → 429（`ponytail:` isolate 不共享，升级 D1/KV）
+- [x] 登录成功时 `DELETE FROM sessions WHERE expires_at < datetime('now')`（与 INSERT 同 `batch`）
+- [x] `scripts/seed-admin.sql` + `pnpm db:seed:admin`（仅 `--local`）：`admin` / `local-dev-only`。测试自插用户，不读该文件。`vitest.config.ts` 注入测试用 `SESSION_SECRET`
+- [x] `tests/lib/password.test.ts`、`tests/api/auth.test.ts`：错密码无 Cookie、登录/me/logout、未登录 ping 401、第 6 次失败 429、种子 hash 可 verify
 
-**验收**：错误密码 401；正确密码得 Cookie；带 Cookie 访问 `/api/auth/me` 返回用户；登出后再访问 401。
+**验收**：错误密码 401；正确密码得 Cookie；带 Cookie 访问 `/api/auth/me` 返回用户；登出后再访问 401；无 Cookie 访问 `/admin` 到登录页、`/api/admin/ping` 401。 ✅ 2026-09-18
 
 ---
 
@@ -179,7 +183,7 @@
 - [ ] `GET/POST /api/admin/posts`，`GET/PUT/DELETE /api/admin/posts/:id`
 - [ ] 写入时：校验 slug 唯一与格式；用 `unified` + Fuwari remark/rehype 插件 + `rehype-expressive-code` 渲染 `body_html`；计算 `word_count` / `reading_minutes`
 - [ ] **风险：** 在 workerd 验证 shiki / Expressive Code 可运行；不可则退化为纯 `<pre>`（记 `ponytail:`）
-- [ ] `/admin/login`、`/admin/posts`（列表 + 快捷发布/撤回）、`/admin/posts/new`、`/admin/posts/:id`
+- [ ] `/admin` 换成文章列表 + 快捷发布/撤回；`/admin/posts/new`、`/admin/posts/:id`（登录页已在阶段 3）
 - [ ] 编辑页：标题 / slug / 摘要 / 标签 / 封面 URL / 状态 / Markdown 大文本框 / 预览
 - [ ] `POST /api/admin/ai/*` 一律返回 `501`
 - [ ] Vitest：CRUD 全流程 + 未登录调用全部 401
@@ -229,7 +233,7 @@
 | 0 脚手架 | `[x]` | 2026-09-17 |
 | 1 主题迁入 | `[x]` | 2026-09-17 |
 | 2 数据层 | `[x]` | 2026-09-18 |
-| 3 鉴权 | `[ ]` | — |
+| 3 鉴权 | `[x]` | 2026-09-18 |
 | 4 后台 CRUD | `[ ]` | — |
 | 5 MVP 部署 | `[ ]` | — |
 | 二期 | `[ ]` | — |

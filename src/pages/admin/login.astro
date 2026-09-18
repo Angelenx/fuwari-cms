@@ -1,0 +1,72 @@
+---
+// Bare page (no Fuwari grid). fetch + location.assign so Swup does not intercept.
+import "@/styles/tailwind.css";
+---
+
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Admin login</title>
+	</head>
+	<body class="min-h-screen bg-zinc-100 text-zinc-900 flex items-center justify-center p-4">
+		<form
+			id="login-form"
+			class="w-full max-w-sm space-y-4 rounded-xl bg-white p-8 shadow"
+		>
+			<h1 class="text-lg font-medium">Sign in</h1>
+			<label class="block text-sm">
+				Username
+				<input
+					class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
+					name="username"
+					autocomplete="username"
+					required
+				/>
+			</label>
+			<label class="block text-sm">
+				Password
+				<input
+					class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
+					type="password"
+					name="password"
+					autocomplete="current-password"
+					required
+				/>
+			</label>
+			<p id="login-error" class="hidden text-sm text-red-600"></p>
+			<button
+				class="w-full rounded bg-zinc-900 px-3 py-2 text-white"
+				type="submit"
+			>
+				Sign in
+			</button>
+		</form>
+		<script is:inline>
+			const form = document.getElementById("login-form");
+			const errorEl = document.getElementById("login-error");
+			form.addEventListener("submit", async (event) => {
+				event.preventDefault();
+				errorEl.classList.add("hidden");
+				const data = new FormData(form);
+				const res = await fetch("/api/auth/login", {
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({
+						username: data.get("username"),
+						password: data.get("password"),
+					}),
+				});
+				if (!res.ok) {
+					errorEl.textContent =
+						res.status === 429
+							? "Too many attempts. Try again later."
+							: "Invalid credentials.";
+					errorEl.classList.remove("hidden");
+					return;
+				}
+				location.assign("/admin");
+			});
+		</script>
+	</body>
+</html>

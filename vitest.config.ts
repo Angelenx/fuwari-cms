@@ -17,7 +17,10 @@ export default defineConfig({
 					compatibilityFlags: ["nodejs_compat"],
 					d1Databases: ["DB"],
 					// Test-only: setup file applies these to env.DB via applyD1Migrations.
-					bindings: { TEST_MIGRATIONS: migrations },
+					bindings: {
+						TEST_MIGRATIONS: migrations,
+						SESSION_SECRET: "test-session-secret-at-least-32-chars",
+					},
 				},
 			};
 		}),

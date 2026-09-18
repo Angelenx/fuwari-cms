@@ -1,4 +1,7 @@
 import { Hono } from "hono";
+import { admin } from "./admin";
+import { auth } from "./auth";
+import type { AppEnv } from "./env";
 
 /**
  * JSON API mounted under `/api` by `src/fetch.ts`.
@@ -6,7 +9,9 @@ import { Hono } from "hono";
  * Kept free of Astro imports so it can be unit-tested with `api.request()`
  * without booting the Astro pipeline.
  */
-export const api = new Hono()
+export const api = new Hono<AppEnv>()
 	.get("/health", (c) => c.json({ ok: true }))
+	.route("/auth", auth)
+	.route("/admin", admin)
 	// Trust boundary: anything under /api that is not routed above is a 404, never falls through to Astro pages.
 	.notFound((c) => c.json({ error: "Not Found" }, 404));

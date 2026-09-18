@@ -1,2 +1,5 @@
 # Copy to .dev.vars for local development. Production values go through `wrangler secret put`.
 SESSION_SECRET="replace-with-a-long-random-string"
+
+# After `pnpm db:seed:admin`, sign in at /admin/login as admin / local-dev-only.
+# That password is local demo only; do not use it remotely.

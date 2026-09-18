@@ -1,0 +1,39 @@
+---
+import { env } from "cloudflare:workers";
+import { getSessionFromRequest } from "@lib/auth/session";
+import "@/styles/tailwind.css";
+
+const user = await getSessionFromRequest(Astro.request, env);
+if (!user) {
+	return Astro.redirect("/admin/login");
+}
+---
+
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Admin</title>
+	</head>
+	<body class="min-h-screen bg-zinc-100 text-zinc-900 flex items-center justify-center p-4">
+		<div class="w-full max-w-sm space-y-4 rounded-xl bg-white p-8 shadow">
+			<h1 class="text-lg font-medium">Signed in as {user.username}</h1>
+			<p class="text-sm text-zinc-600">
+				Post CRUD lands in phase 4. This page only proves the session guard works.
+			</p>
+			<button
+				id="logout"
+				class="w-full rounded bg-zinc-900 px-3 py-2 text-white"
+				type="button"
+			>
+				Log out
+			</button>
+		</div>
+		<script is:inline>
+			document.getElementById("logout").addEventListener("click", async () => {
+				await fetch("/api/auth/logout", { method: "POST" });
+				location.assign("/admin/login");
+			});
+		</script>
+	</body>
+</html>
