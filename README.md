@@ -31,7 +31,7 @@
 
 ### 一期成功标准
 
-对照 [docs/初版开发思路.md](./docs/初版开发思路.md) 第 12 节，**代码已满足**下列条目；线上是否通过取决于你是否按本文完成远端 D1、密钥与 `pnpm deploy`。
+对照 [docs/初版开发思路.md](./docs/初版开发思路.md) 第 12 节，**代码已满足**下列条目；线上是否通过取决于你是否按本文完成远端 D1、密钥与 `pnpm run deploy`。
 
 - 管理员能登录后台，创建 / 编辑 / 发布 / 撤回草稿
 - 公开站首页、文章页、标签 / 归档看起来就是 Fuwari 那路
@@ -228,10 +228,10 @@ pnpm db:migrate:remote
 pnpm install
 # 已完成：wrangler.jsonc 里的 database_id、pnpm db:migrate:remote
 pnpm exec wrangler secret put SESSION_SECRET
-pnpm deploy
+pnpm run deploy
 ```
 
-`pnpm deploy` = `pnpm build` + `wrangler deploy`。之后改代码再执行一次 `pnpm deploy` 即可；库结构变了再跑 `pnpm db:migrate:remote`。
+必须写 `pnpm run deploy`：pnpm 9 把裸的 `pnpm deploy` 当成 workspace 拷包命令，会报 `ERR_PNPM_CANNOT_DEPLOY`。脚本内容是 `pnpm build` + `wrangler deploy`。之后改代码再执行一次 `pnpm run deploy` 即可；库结构变了再跑 `pnpm db:migrate:remote`。
 
 ### 方法 B — GitHub Actions
 
