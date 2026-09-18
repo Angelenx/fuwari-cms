@@ -25,7 +25,7 @@
 
 **策略：拷贝主题壳，替换内容源。** 从 Fuwari 固定提交 `6d39b0d` 带走 Layout / Navbar / 卡片 / Markdown 样式；去掉 Content Collections 与 `getCollection`。文章 Markdown 存在 D1 的 `body_md`，**写入时**在 Worker 里渲染成 `body_html`，前台只读缓存 HTML。草稿永远不进公开查询。
 
-一期边界：封面/头像/banner 用 URL 字符串（外链或站点内路径），不上 R2；无评论、无全文搜索、无真 AI（`/api/admin/ai/*` 返回 501）。`site_settings` 里空着的字段按字段 overlay [`src/config.ts`](./src/config.ts) 的当前前端默认值。
+一期边界：封面/头像/banner 用 URL 字符串（外链或站点内路径），不上 R2；无评论、无 FTS 全文索引、无真 AI（`/api/admin/ai/*` 返回 501）。导航搜索走 `GET /api/search`（对已发布帖 `LIKE`，草稿不进结果）。`site_settings` 里空着的字段按字段 overlay [`src/config.ts`](./src/config.ts) 的当前前端默认值。
 
 后台保持素：Markdown 文本框 + 预览弹窗。好看留给前台。
 
@@ -406,10 +406,10 @@ CI 里不要写 `pnpm deploy`（同样会撞上 pnpm 内置命令）；也不要
 ## 分期
 
 **一期（MVP，已实现）**  
-登录、文章 CRUD、资料/站点/About、中英 UI、公开列表/详情/标签/归档对齐 Fuwari、草稿不公开。
+登录、文章 CRUD、资料/站点/About、中英 UI、公开列表/详情/标签/归档对齐 Fuwari、草稿不公开、导航搜索（`/api/search`）。
 
 **二期**  
-R2 上传、Workers AI（标题/摘要等）、搜索。
+R2 上传、Workers AI（标题/摘要等）、D1 FTS5。
 
 **三期**  
 更舒服的编辑器、统计与其它扩展（按需）。

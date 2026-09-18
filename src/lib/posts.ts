@@ -144,3 +144,92 @@ export async function getSpecPageHtml(name: "about"): Promise<string> {
 	const { about } = await getSiteSettings();
 	return about.html;
 }
+
+export type PublicSearchHit = {
+	url: string;
+	meta: { title: string };
+	excerpt: string;
+};
+
+type SearchRow = {
+	slug: string;
+	title: string;
+	description: string;
+	excerpt: string;
+	body_md: string;
+};
+
+function likeContains(q: string): string | undefined {
+	const literal = q.replace(/[%_]/g, "").trim().slice(0, 80);
+	if (!literal) {
+		return undefined;
+	}
+	return `%${literal}%`;
+}
+
+function escapeHtml(value: string): string {
+	return value
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;");
+}
+
+function clipAround(text: string, needle: string, radius = 60): string {
+	const i = text.toLowerCase().indexOf(needle.toLowerCase());
+	if (i < 0) {
+		return text.length > 160 ? `${text.slice(0, 160)}…` : text;
+	}
+	const start = Math.max(0, i - radius);
+	const end = Math.min(text.length, i + needle.length + radius);
+	return `${start > 0 ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}`;
+}
+
+function snippetFor(row: SearchRow, needle: string): string {
+	const fields = [row.excerpt, row.description, row.body_md, row.title];
+	const lower = needle.toLowerCase();
+	for (const field of fields) {
+		if (field.toLowerCase().includes(lower)) {
+			return clipAround(field, needle);
+		}
+	}
+	return row.excerpt || row.description || row.title;
+}
+
+function markNeedle(text: string, needle: string): string {
+	const safe = escapeHtml(text);
+	const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	return safe.replace(
+		new RegExp(escaped, "gi"),
+		(match) => `<mark>${match}</mark>`,
+	);
+}
+
+/**
+ * Navbar search. Published posts only.
+ * ponytail: LIKE over title/body is enough for a personal blog. Upgrade: D1 FTS5.
+ */
+export async function searchPublishedPosts(
+	q: string,
+): Promise<PublicSearchHit[]> {
+	const pattern = likeContains(q);
+	if (!pattern) {
+		return [];
+	}
+	const needle = pattern.slice(1, -1);
+	const { results } = await env.DB.prepare(
+		`SELECT slug, title, description, excerpt, body_md
+		 FROM posts
+		 WHERE status = 'published'
+		   AND (title LIKE ? OR slug LIKE ? OR description LIKE ? OR excerpt LIKE ? OR body_md LIKE ?)
+		 ORDER BY published_at DESC, id DESC
+		 LIMIT 20`,
+	)
+		.bind(pattern, pattern, pattern, pattern, pattern)
+		.all<SearchRow>();
+	return results.map((row) => ({
+		url: `/posts/${row.slug}/`,
+		meta: { title: row.title },
+		excerpt: markNeedle(snippetFor(row, needle), needle),
+	}));
+}

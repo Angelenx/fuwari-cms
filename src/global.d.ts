@@ -8,17 +8,10 @@ declare global {
 		queueAdminToast?: (ok: boolean, message: string) => void;
 		adminNavigate?: (href: string) => Promise<void>;
 		__adminChromeBooted?: boolean;
-		pagefind: {
-			search: (query: string) => Promise<{
-				results: Array<{
-					data: () => Promise<SearchResult>;
-				}>;
-			}>;
-		};
 	}
 }
 
-interface SearchResult {
+export interface SearchResult {
 	url: string;
 	meta: {
 		title: string;

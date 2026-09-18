@@ -206,7 +206,7 @@
 - [x] 逐条核对成功标准，写入 README「一期成功标准」（线上验收仍取决于上述远端步骤）
 - [x] `MONUMENTS.md` 记录阶段 5 文档与部署说明就绪（不是「已代为上线」）
 
-**一期不做**：真 AI、评论、搜索、多作者、重型编辑器、边缘缓存。
+**一期不做**：真 AI、评论、FTS 全文索引、多作者、重型编辑器、边缘缓存。导航 `LIKE` 搜索已走 `GET /api/search`。
 
 ---
 
@@ -216,7 +216,7 @@
 
 - [ ] R2：`POST /api/admin/media` multipart 上传，MIME 白名单，`media` 表
 - [ ] Workers AI：标题 / 摘要 / 标签建议，替换 `501` stub
-- [ ] 搜索：D1 FTS5（先用 `wrangler d1 execute` 验证虚拟表可用）
+- [ ] 搜索：D1 FTS5（`GET /api/search` 已用 LIKE；先用 `wrangler d1 execute` 验证虚拟表可用再替换）
 - [ ] RSS / sitemap / OG 图（RSS 复用 Fuwari 的 `@astrojs/rss`）
 - [ ] 可选：Cloudflare Access 替代自建密码
 - [ ] 可选：发文后失效公开页缓存
