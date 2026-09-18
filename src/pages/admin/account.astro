@@ -1,0 +1,87 @@
+---
+import { env } from "cloudflare:workers";
+import AdminChrome from "@components/admin/AdminChrome.astro";
+import { getSessionFromRequest } from "@lib/auth/session";
+import { MIN_PASSWORD_LENGTH } from "@lib/auth/setup";
+
+const user = await getSessionFromRequest(Astro.request, env);
+if (!user) {
+	return Astro.redirect("/admin/login");
+}
+---
+
+<AdminChrome loggedIn title="Account">
+	<form class="card-base space-y-3 p-6" id="password-form">
+		<p class="text-sm text-[var(--btn-content)]">
+			Username: <code>{user.username}</code>
+		</p>
+		<label class="block text-sm">
+			Current password
+			<input
+				autocomplete="current-password"
+				class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+				name="currentPassword"
+				required
+				type="password"
+			/>
+		</label>
+		<label class="block text-sm">
+			New password
+			<input
+				autocomplete="new-password"
+				class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+				minlength={MIN_PASSWORD_LENGTH}
+				name="newPassword"
+				required
+				type="password"
+			/>
+		</label>
+		<label class="block text-sm">
+			Confirm new password
+			<input
+				autocomplete="new-password"
+				class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+				minlength={MIN_PASSWORD_LENGTH}
+				name="confirm"
+				required
+				type="password"
+			/>
+		</label>
+		<button class="btn-regular rounded-lg px-3 py-2 text-sm" type="submit">
+			Change password
+		</button>
+	</form>
+	<script is:inline>
+		const form = document.getElementById("password-form");
+		form.addEventListener("submit", async (event) => {
+			event.preventDefault();
+			const data = new FormData(form);
+			const newPassword = String(data.get("newPassword") ?? "");
+			const confirm = String(data.get("confirm") ?? "");
+			if (newPassword !== confirm) {
+				window.adminToast(false, "Passwords do not match.");
+				return;
+			}
+			const res = await fetch("/api/admin/password", {
+				method: "PUT",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					currentPassword: data.get("currentPassword") ?? "",
+					newPassword,
+				}),
+			});
+			const body = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				window.adminToast(
+					false,
+					typeof body.error === "string"
+						? body.error
+						: "Could not change password.",
+				);
+				return;
+			}
+			form.reset();
+			window.adminToast(true, "Password updated.");
+		});
+	</script>
+</AdminChrome>

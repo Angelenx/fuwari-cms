@@ -1,3 +1,4 @@
+import { env } from "cloudflare:workers";
 import { Hono } from "hono";
 import {
 	createPost,
@@ -7,7 +8,9 @@ import {
 	type PostWriteInput,
 	updatePost,
 } from "../lib/admin-posts";
-import { getSession } from "../lib/auth/session";
+import { hashPassword, verifyPassword } from "../lib/auth/password";
+import { createSession, getSession } from "../lib/auth/session";
+import { MIN_PASSWORD_LENGTH } from "../lib/auth/setup";
 import { renderMarkdown } from "../lib/markdown";
 import {
 	getSiteSettings,
@@ -347,6 +350,53 @@ export const admin = new Hono<AppEnv>()
 			bodyHtml: rendered.bodyHtml,
 		});
 		return c.json({ bodyMd: saved.about.md, bodyHtml: saved.about.html });
+	})
+	.put("/password", async (c) => {
+		const user = await getSession(c);
+		if (!user) {
+			return c.json({ error: "Unauthorized" }, 401);
+		}
+		let body: unknown;
+		try {
+			body = await c.req.json();
+		} catch {
+			return c.json({ error: "Invalid JSON" }, 400);
+		}
+		if (
+			!jsonBody(body) ||
+			typeof body.currentPassword !== "string" ||
+			typeof body.newPassword !== "string"
+		) {
+			return c.json({ error: "Invalid body" }, 400);
+		}
+		if (body.newPassword.length < MIN_PASSWORD_LENGTH) {
+			return c.json(
+				{
+					error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+				},
+				400,
+			);
+		}
+		const row = await env.DB.prepare(
+			"SELECT password_hash FROM users WHERE id = ?",
+		)
+			.bind(user.id)
+			.first<{ password_hash: string }>();
+		const ok = await verifyPassword(body.currentPassword, row?.password_hash);
+		if (!row || !ok) {
+			return c.json({ error: "Invalid current password" }, 401);
+		}
+		const passwordHash = await hashPassword(body.newPassword);
+		// Drop every sid for this user so stolen cookies die; issue a fresh one.
+		await env.DB.batch([
+			env.DB.prepare("UPDATE users SET password_hash = ? WHERE id = ?").bind(
+				passwordHash,
+				user.id,
+			),
+			env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(user.id),
+		]);
+		await createSession(c, user.id);
+		return c.json({ ok: true });
 	})
 	.all("/ai/:name", (c) => c.json({ error: "Not Implemented" }, 501))
 	.route("/posts", posts)

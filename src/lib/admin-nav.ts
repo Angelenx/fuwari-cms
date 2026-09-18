@@ -18,6 +18,9 @@ export function adminTabHref(pathname: string): string | null {
 	if (path === "/admin/about") {
 		return "/admin/about";
 	}
+	if (path === "/admin/account") {
+		return "/admin/account";
+	}
 	return null;
 }
 

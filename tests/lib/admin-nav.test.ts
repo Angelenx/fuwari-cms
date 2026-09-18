@@ -13,6 +13,7 @@ describe("admin nav", () => {
 		expect(adminTabHref("/admin/profile")).toBe("/admin/profile");
 		expect(adminTabHref("/admin/site")).toBe("/admin/site");
 		expect(adminTabHref("/admin/about")).toBe("/admin/about");
+		expect(adminTabHref("/admin/account")).toBe("/admin/account");
 		expect(adminTabHref("/admin/login")).toBeNull();
 		expect(isAdminAppPath("/admin/login")).toBe(false);
 		expect(isAdminAppPath("/admin/profile")).toBe(true);
