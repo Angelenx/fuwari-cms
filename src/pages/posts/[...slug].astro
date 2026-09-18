@@ -4,7 +4,7 @@ import Markdown from "@components/misc/Markdown.astro";
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
-import { getSortedPosts } from "@utils/content-utils";
+import { getPublishedPost } from "@lib/posts";
 import { getPostUrlBySlug } from "@utils/url-utils";
 import { Icon } from "astro-icon/components";
 import ImageWrapper from "../../components/misc/ImageWrapper.astro";
@@ -12,11 +12,8 @@ import PostMetadata from "../../components/PostMeta.astro";
 import { licenseConfig, profileConfig, siteConfig } from "../../config";
 import { formatDateToYYYYMMDD } from "../../utils/date-utils";
 
-// Neighbour links come from the sorted list, so look the post up there instead of fetching it alone.
-// ponytail: loads every published post (with bodies) per request; fine for a personal blog, swap for a
-// single-row query plus prev/next lookups once D1 is wired (PLAN.md phase 2).
 const slug = (Astro.params.slug ?? "").replace(/\/$/, "");
-const entry = (await getSortedPosts()).find((p) => p.slug === slug);
+const entry = await getPublishedPost(slug);
 if (!entry) {
 	return new Response("Not Found", { status: 404 });
 }

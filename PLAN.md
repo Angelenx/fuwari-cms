@@ -136,18 +136,20 @@
 
 ## 阶段 2 · 数据层（D1 读通路）
 
-**目标**：手写 SQL 插一篇文章，前台刷新即可见；草稿绝不外泄。
+**目标**：手写 SQL 插一篇文章，前台刷新即可见；草稿绝不外泄。本阶段不实现登录、后台 CRUD、写入时 Markdown 渲染。
 
-**参考文档：** [D1 入门](https://developers.cloudflare.com/d1/get-started/)、[D1 Migrations](https://developers.cloudflare.com/d1/reference/migrations/)、[D1 本地开发](https://developers.cloudflare.com/d1/best-practices/local-development/)、[`wrangler d1`](https://developers.cloudflare.com/workers/wrangler/commands/d1/)、[`@astrojs/cloudflare` · env](https://docs.astro.build/en/guides/integrations-guide/cloudflare/)、[Vitest 第一个测试](https://developers.cloudflare.com/workers/testing/vitest-integration/write-your-first-test/)
+**参考文档：** [D1 入门](https://developers.cloudflare.com/d1/get-started/)、[D1 Migrations](https://developers.cloudflare.com/d1/reference/migrations/)、[D1 本地开发](https://developers.cloudflare.com/d1/best-practices/local-development/)、[`wrangler d1`](https://developers.cloudflare.com/workers/wrangler/commands/d1/)、[`@astrojs/cloudflare` · env](https://docs.astro.build/en/guides/integrations-guide/cloudflare/)、[Vitest 配置 · `readD1Migrations`](https://developers.cloudflare.com/workers/testing/vitest-integration/configuration/)、[Vitest 测试 API · `applyD1Migrations`](https://developers.cloudflare.com/workers/testing/vitest-integration/test-apis/)
 
-- [ ] `wrangler d1 migrations create` 写出 `0001_init.sql`：`users` / `sessions` / `posts` / `tags` / `post_tags`；`wrangler d1 migrations apply --local`
-- [ ] 索引：`posts(status, published_at DESC)`、`posts(slug)`、`sessions(expires_at)`
-- [ ] 种子脚本：创建管理员（密码从环境读入，不写死）
-- [ ] 把 `src/lib/posts.ts` 的假数据换成 D1 查询（保持 `listPublishedPosts` / `getPublishedPost` / `getSpecPageHtml` 签名，行 → `PostEntry` 映射放在同文件）；绑定用 `import { env } from "cloudflare:workers"`；**公开查询统一带 `status = 'published'`**；`posts/[...slug]` 改为单行查询 + prev/next（见文件内 `ponytail:` 注）
-- [ ] 前台各页无需改动（已全部经 `content-utils` → `@lib/posts` 取数）；`vitest.config.ts` 的 `miniflare` 加 `d1Databases: ["DB"]` 并用 `readD1Migrations` 跑迁移
-- [ ] Vitest 检查：插入一篇 `draft`、一篇 `published`，断言公开列表只含后者
+- [x] `migrations/0001_init.sql`：`users` / `sessions` / `posts` / `tags` / `post_tags`。`posts` 补上 `PostEntry` 需要而设计文档未写的列（`excerpt`、`lang`、`headings_json`）；`status='published'` 时 `published_at` 非空；slug 靠 UNIQUE 索引，不另建。`pnpm db:migrate:local`
+- [x] 索引：`posts(status, published_at DESC)`、`sessions(expires_at)`
+- [x] `users` / `sessions` 建表但保持空。**管理员种子推迟到阶段 3**（需要 PBKDF2）；本阶段不写 `password.ts`
+- [x] 演示文章在 `scripts/seed.sql`（阶段 1 的 3 篇 published + 1 篇 draft），**不进**会应用到远端的 migration。`pnpm db:seed:local`（`wrangler d1 execute --local --yes --file`）
+- [x] `src/lib/posts.ts` 假数据换成 D1；签名不变；`import { env } from "cloudflare:workers"`；公开查询一律 `status = 'published'`。`listPublishedPosts` 全表带 `body_html`（`ponytail:`：个人博客够用，升级为列表不选正文）。`getPublishedPost` 单行 + prev/next（next=更新、prev=更旧）。`getSpecPageHtml("about")` 仍硬编码
+- [x] `posts/[...slug]` 改调 `getPublishedPost`；其余前台页仍走 `content-utils` → `@lib/posts`
+- [x] `vitest.config.ts` 继续不读 wrangler `main`；`miniflare` 加 `d1Databases: ["DB"]`，`readD1Migrations` 从 `@cloudflare/vitest-plugin` 根导出（官方类型注释里的 `/config` 子路径在 1.1 已不存在）。`tests/apply-migrations.ts` 调 `applyD1Migrations`
+- [x] `tests/lib/posts.test.ts`：插入 `draft` + `published`（带 tag），公开列表只含后者，草稿 slug 为 `undefined`。`pnpm test` 前置 `wrangler types`
 
-**验收**：`wrangler d1 execute --local` 插入后前台可见；draft 测试通过。
+**验收**：`pnpm db:migrate:local && pnpm db:seed:local` 后前台可见 3 篇 published，`/posts/draft-post/` 404；再 `wrangler d1 execute --local` 插入一篇后刷新可见；draft 测试通过。 ✅ 2026-09-18
 
 ---
 
@@ -226,7 +228,7 @@
 |------|------|----------|
 | 0 脚手架 | `[x]` | 2026-09-17 |
 | 1 主题迁入 | `[x]` | 2026-09-17 |
-| 2 数据层 | `[ ]` | — |
+| 2 数据层 | `[x]` | 2026-09-18 |
 | 3 鉴权 | `[ ]` | — |
 | 4 后台 CRUD | `[ ]` | — |
 | 5 MVP 部署 | `[ ]` | — |

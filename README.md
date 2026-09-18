@@ -1,6 +1,6 @@
 # Fuwari CMS
 
-> **状态：开发中 · 阶段 0–1 完成**（脚手架 + Fuwari 主题以 SSR 跑通，数据仍为假文章）  
+> **状态：开发中 · 阶段 0–2 完成**（脚手架 + Fuwari 主题 SSR + D1 读通路；后台登录仍未做）  
 > Fuwari 风前台 + Cloudflare D1 正文库 + 独立写稿后台。
 
 想做一个**看起来像 [Fuwari](https://github.com/saicaca/fuwari)**、但**文章存在数据库、能后台编辑**的个人博客——跑在 Cloudflare 上，而不是每次改 Markdown 再重新构建部署。
@@ -14,12 +14,13 @@
 ```sh
 pnpm install
 cp .dev.vars.example .dev.vars   # 本地密钥，勿提交
+pnpm db:migrate:local            # 应用 migrations/ 到本地 D1
+pnpm db:seed:local               # 写入演示文章（仅本地；不要 --remote）
 pnpm dev                         # wrangler types + astro dev（workerd），http://localhost:4321
 pnpm build                       # astro check + astro build → dist/
 pnpm preview                     # 用 wrangler 跑 dist/ 里的生产包
 pnpm lint / pnpm format          # Biome
-pnpm test                        # Vitest（@cloudflare/vitest-plugin，跑在 workerd 内）
-pnpm db:migrate:local            # 应用 migrations/ 到本地 D1
+pnpm test                        # wrangler types + Vitest（@cloudflare/vitest-plugin，跑在 workerd 内）
 ```
 
 ---
@@ -83,12 +84,13 @@ R2 上传、Workers AI（标题/摘要等）、搜索。
 ├── src/
 │   ├── fetch.ts              # Worker 入口：Hono(/api) → astro/hono 管线
 │   ├── api/app.ts            # Hono 路由（可脱离 Astro 单测）
-│   ├── lib/posts.ts          # 文章数据源接缝（阶段 1 假数据，阶段 2 换 D1）
+│   ├── lib/posts.ts          # 文章数据源（D1，公开查询仅 published）
 │   ├── types/post.ts         # PostEntry：预渲染 bodyHtml + 摘要/字数/目录
 │   ├── pages/ components/ layouts/ styles/ i18n/ utils/ constants/ assets/ config.ts
 │   │                         # Fuwari 主题（改编说明见 third_party/fuwari/README.md）
 ├── tests/                    # Vitest（workerd）
 ├── migrations/               # D1 迁移 SQL
+├── scripts/seed.sql          # 本地演示文章（不要应用到远端）
 ├── astro.config.mjs  wrangler.jsonc  vitest.config.ts  biome.json  tsconfig.json
 ├── PLAN.md  MONUMENTS.md  AGENTS.md
 ├── docs/初版开发思路.md

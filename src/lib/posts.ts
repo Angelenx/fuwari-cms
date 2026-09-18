@@ -1,111 +1,148 @@
+import { env } from "cloudflare:workers";
+import type { MarkdownHeading } from "astro";
 import type { PostEntry } from "@/types/post";
 
 /**
- * Post repository seam. Phase 1 serves hard-coded posts so the theme can be
- * verified; phase 2 swaps the internals for D1 without touching callers.
- *
- * Public-facing functions never return drafts.
+ * Post repository backed by D1. Public-facing functions never return drafts:
+ * every SELECT includes `status = 'published'`.
  */
-
-const MOCK_POSTS: PostEntry[] = [
-	{
-		slug: "hello-fuwari-cms",
-		data: {
-			title: "Hello, Fuwari CMS",
-			published: new Date("2026-09-15"),
-			updated: new Date("2026-09-16"),
-			draft: false,
-			description:
-				"The Fuwari theme running as an SSR Worker with a mock data source.",
-			image: "",
-			tags: ["Astro", "Cloudflare"],
-			category: "Meta",
-			lang: "en",
-		},
-		bodyHtml:
-			'<h2 id="why">Why</h2><p>This post is rendered from a pre-computed HTML string, exactly like posts stored in D1 will be.</p><h2 id="next">Next</h2><p>Phase 2 replaces <code>src/lib/posts.ts</code> internals with D1 queries.</p>',
-		excerpt: "This post is rendered from a pre-computed HTML string.",
-		words: 32,
-		minutes: 1,
-		headings: [
-			{ depth: 2, slug: "why", text: "Why" },
-			{ depth: 2, slug: "next", text: "Next" },
-		],
-	},
-	{
-		slug: "cover-image-demo",
-		data: {
-			title: "Post with an external cover image",
-			published: new Date("2026-09-10"),
-			draft: false,
-			description: "",
-			image: "https://picsum.photos/seed/fuwari-cms/1200/630",
-			tags: ["Demo"],
-			category: "Examples",
-			lang: "en",
-		},
-		bodyHtml:
-			"<p>Cover images are external URLs in phase 1; R2 uploads arrive in a later phase.</p><blockquote><p>The excerpt below is precomputed rather than derived from a remark plugin.</p></blockquote>",
-		excerpt:
-			"Cover images are external URLs in phase 1; R2 uploads arrive in a later phase.",
-		words: 24,
-		minutes: 1,
-		headings: [],
-	},
-	{
-		slug: "zh-cn-post",
-		data: {
-			title: "中文文章示例",
-			published: new Date("2025-12-01"),
-			draft: false,
-			description: "验证中文排版、标签与分类过滤。",
-			image: "",
-			tags: ["示例", "Demo"],
-			category: null,
-			lang: "zh_CN",
-		},
-		bodyHtml: "<p>这是一篇没有分类的文章，用来验证归档页的「未分类」过滤。</p>",
-		excerpt: "这是一篇没有分类的文章。",
-		words: 25,
-		minutes: 1,
-		headings: [],
-	},
-	{
-		slug: "draft-post",
-		data: {
-			title: "Draft that must never be public",
-			published: new Date("2026-09-17"),
-			draft: true,
-			description: "",
-			image: "",
-			tags: ["Draft"],
-			category: "Meta",
-			lang: "en",
-		},
-		bodyHtml:
-			"<p>If you can read this on the public site, draft filtering is broken.</p>",
-		excerpt: "",
-		words: 14,
-		minutes: 1,
-		headings: [],
-	},
-];
 
 const ABOUT_HTML =
 	"<p>This is the about page. It will be editable from <code>/admin</code> once the data layer lands.</p>";
 
+type PostRow = {
+	id: number;
+	slug: string;
+	title: string;
+	description: string;
+	body_html: string;
+	excerpt: string;
+	cover_url: string;
+	category: string | null;
+	lang: string;
+	published_at: string;
+	updated_at: string | null;
+	word_count: number;
+	reading_minutes: number;
+	headings_json: string;
+	tag_names: string | null;
+};
+
+type NeighborRow = {
+	slug: string;
+	title: string;
+};
+
+// Shared projection for list + slug lookup; tags are folded into one column.
+const PUBLISHED_SELECT = `SELECT
+	p.id,
+	p.slug,
+	p.title,
+	p.description,
+	p.body_html,
+	p.excerpt,
+	p.cover_url,
+	p.category,
+	p.lang,
+	p.published_at,
+	p.updated_at,
+	p.word_count,
+	p.reading_minutes,
+	p.headings_json,
+	GROUP_CONCAT(t.name) AS tag_names
+FROM posts p
+LEFT JOIN post_tags pt ON pt.post_id = p.id
+LEFT JOIN tags t ON t.id = pt.tag_id`;
+
+/** SQLite `datetime('now')` is UTC without an offset; ISO strings parse as-is. */
+function parseSqliteDate(value: string): Date {
+	if (value.includes("T") || /(?:Z|[+-]\d{2}:\d{2})$/.test(value)) {
+		return new Date(value);
+	}
+	return new Date(`${value.replace(" ", "T")}Z`);
+}
+
+function rowToEntry(
+	row: PostRow,
+	neighbors: Pick<
+		PostEntry["data"],
+		"prevSlug" | "prevTitle" | "nextSlug" | "nextTitle"
+	> = {},
+): PostEntry {
+	return {
+		slug: row.slug,
+		data: {
+			title: row.title,
+			published: parseSqliteDate(row.published_at),
+			...(row.updated_at ? { updated: parseSqliteDate(row.updated_at) } : {}),
+			draft: false,
+			description: row.description,
+			image: row.cover_url,
+			tags: row.tag_names ? row.tag_names.split(",") : [],
+			category: row.category,
+			lang: row.lang,
+			...neighbors,
+		},
+		bodyHtml: row.body_html,
+		excerpt: row.excerpt,
+		words: row.word_count,
+		minutes: row.reading_minutes,
+		headings: JSON.parse(row.headings_json) as MarkdownHeading[],
+	};
+}
+
 /** Published posts, newest first. */
 export async function listPublishedPosts(): Promise<PostEntry[]> {
-	return MOCK_POSTS.filter((p) => !p.data.draft).sort(
-		(a, b) => b.data.published.getTime() - a.data.published.getTime(),
-	);
+	// ponytail: loads every published body per request. Fine for a personal blog;
+	// upgrade by dropping body_html from this SELECT once RSS has its own query.
+	const { results } = await env.DB.prepare(
+		`${PUBLISHED_SELECT}
+		 WHERE p.status = 'published'
+		 GROUP BY p.id
+		 ORDER BY p.published_at DESC, p.id DESC`,
+	).all<PostRow>();
+	return results.map((row) => rowToEntry(row));
 }
 
 /** A single published post, or `undefined` for unknown slugs and drafts. */
 export async function getPublishedPost(
 	slug: string,
 ): Promise<PostEntry | undefined> {
-	return (await listPublishedPosts()).find((p) => p.slug === slug);
+	const post = await env.DB.prepare(
+		`${PUBLISHED_SELECT}
+		 WHERE p.status = 'published' AND p.slug = ?
+		 GROUP BY p.id`,
+	)
+		.bind(slug)
+		.first<PostRow>();
+	if (!post) {
+		return undefined;
+	}
+
+	// Neighbour order matches getSortedPosts: next = newer, prev = older.
+	const [newer, older] = await env.DB.batch<NeighborRow>([
+		env.DB.prepare(
+			`SELECT slug, title FROM posts
+			 WHERE status = 'published'
+			   AND (published_at > ? OR (published_at = ? AND id > ?))
+			 ORDER BY published_at ASC, id ASC
+			 LIMIT 1`,
+		).bind(post.published_at, post.published_at, post.id),
+		env.DB.prepare(
+			`SELECT slug, title FROM posts
+			 WHERE status = 'published'
+			   AND (published_at < ? OR (published_at = ? AND id < ?))
+			 ORDER BY published_at DESC, id DESC
+			 LIMIT 1`,
+		).bind(post.published_at, post.published_at, post.id),
+	]);
+	const next = newer.results[0];
+	const prev = older.results[0];
+
+	return rowToEntry(post, {
+		...(next ? { nextSlug: next.slug, nextTitle: next.title } : {}),
+		...(prev ? { prevSlug: prev.slug, prevTitle: prev.title } : {}),
+	});
 }
 
 /** Rendered HTML of a standalone page such as `about`. */

@@ -11,8 +11,9 @@
 		"check": "astro check",
 		"lint": "biome check ./src ./tests",
 		"format": "biome format --write ./src ./tests",
-		"test": "vitest run",
+		"test": "wrangler types && vitest run",
 		"db:migrate:local": "wrangler d1 migrations apply fuwari-cms --local",
+		"db:seed:local": "wrangler d1 execute fuwari-cms --local --yes --file=scripts/seed.sql",
 		"preinstall": "npx only-allow pnpm"
 	},
 	"packageManager": "pnpm@9.14.4",
