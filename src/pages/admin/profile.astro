@@ -4,6 +4,7 @@ import AdminChrome from "@components/admin/AdminChrome.astro";
 import ImageWrapper from "@components/misc/ImageWrapper.astro";
 import { getSessionFromRequest } from "@lib/auth/session";
 import { getSiteSettings } from "@lib/site-settings";
+import { profileConfig, siteConfig } from "@/config";
 
 const user = await getSessionFromRequest(Astro.request, env);
 if (!user) {
@@ -12,6 +13,9 @@ if (!user) {
 
 const { profile, banner } = await getSiteSettings();
 const [csdn, bilibili, github] = profile.links;
+// Bundled demo assets in src/config.ts; empty D1 fields overlay these same paths.
+const defaultAvatar = profileConfig.avatar ?? "";
+const defaultBanner = siteConfig.banner.src;
 ---
 
 <AdminChrome loggedIn title="Profile">
@@ -31,11 +35,21 @@ const [csdn, bilibili, github] = profile.links;
 			}
 			<label class="block text-sm">
 				Avatar URL
-				<input
-					class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
-					name="avatar"
-					value={profile.avatar ?? ""}
-				/>
+				<div class="mt-1 flex gap-2">
+					<input
+						class="min-w-0 flex-1 rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+						name="avatar"
+						value={profile.avatar ?? ""}
+					/>
+					<button
+						class="btn-regular shrink-0 rounded-lg px-3 py-2"
+						data-default={defaultAvatar}
+						data-reset="avatar"
+						type="button"
+					>
+						Reset
+					</button>
+				</div>
 			</label>
 			<label class="block text-sm">
 				Name
@@ -98,11 +112,21 @@ const [csdn, bilibili, github] = profile.links;
 			</label>
 			<label class="block text-sm">
 				Banner URL
-				<input
-					class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
-					name="bannerSrc"
-					value={banner.src}
-				/>
+				<div class="mt-1 flex gap-2">
+					<input
+						class="min-w-0 flex-1 rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+						name="bannerSrc"
+						value={banner.src}
+					/>
+					<button
+						class="btn-regular shrink-0 rounded-lg px-3 py-2"
+						data-default={defaultBanner}
+						data-reset="bannerSrc"
+						type="button"
+					>
+						Reset
+					</button>
+				</div>
 			</label>
 			<label class="block text-sm">
 				Position
@@ -152,6 +176,15 @@ const [csdn, bilibili, github] = profile.links;
 	</form>
 	<script is:inline>
 		const form = document.getElementById("profile-form");
+		form.querySelectorAll("[data-reset]").forEach((button) => {
+			button.addEventListener("click", () => {
+				const name = button.getAttribute("data-reset");
+				const field = name ? form.elements.namedItem(name) : null;
+				if (field && "value" in field) {
+					field.value = button.getAttribute("data-default") ?? "";
+				}
+			});
+		});
 		form.addEventListener("submit", async (event) => {
 			event.preventDefault();
 			const data = new FormData(form);
