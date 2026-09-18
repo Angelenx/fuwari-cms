@@ -104,7 +104,7 @@ export function parseAdminPostListFilter(input: {
 	q?: string | null;
 	tag?: string | null;
 	status?: string | null;
-}): AdminPostListFilter {
+}): { q?: string; tag?: string; status: AdminPostListStatus } {
 	const q = input.q?.trim() || undefined;
 	const tag = input.tag?.trim() || undefined;
 	const status: AdminPostListStatus =
