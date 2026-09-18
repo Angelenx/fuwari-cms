@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { sqliteDateToIso } from "../utils/date-utils";
 import { renderMarkdown } from "./markdown";
 
 /**
@@ -68,8 +69,8 @@ function rowToListItem(row: ListRow): AdminPostListItem {
 		slug: row.slug,
 		title: row.title,
 		status: row.status,
-		publishedAt: row.published_at,
-		updatedAt: row.updated_at,
+		publishedAt: sqliteDateToIso(row.published_at),
+		updatedAt: sqliteDateToIso(row.updated_at),
 	};
 }
 

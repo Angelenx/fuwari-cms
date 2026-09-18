@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import type { MarkdownHeading } from "astro";
 import type { PostEntry } from "@/types/post";
+import { parseSqliteDate } from "../utils/date-utils";
 import { getSiteSettings } from "./site-settings";
 
 /**
@@ -51,14 +52,6 @@ const PUBLISHED_SELECT = `SELECT
 FROM posts p
 LEFT JOIN post_tags pt ON pt.post_id = p.id
 LEFT JOIN tags t ON t.id = pt.tag_id`;
-
-/** SQLite `datetime('now')` is UTC without an offset; ISO strings parse as-is. */
-function parseSqliteDate(value: string): Date {
-	if (value.includes("T") || /(?:Z|[+-]\d{2}:\d{2})$/.test(value)) {
-		return new Date(value);
-	}
-	return new Date(`${value.replace(" ", "T")}Z`);
-}
 
 function rowToEntry(
 	row: PostRow,

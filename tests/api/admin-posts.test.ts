@@ -312,6 +312,33 @@ describe("admin post CRUD", () => {
 		expect(res.status).toBe(400);
 	});
 
+	it("returns ISO publishedAt when D1 stored sqlite datetime", async () => {
+		const cookie = await loginCookie();
+		const slug = `sqlite-date-${crypto.randomUUID()}`;
+		await env.DB.prepare(
+			`INSERT INTO posts (
+				slug, title, description, body_md, body_html, excerpt, cover_url,
+				status, category, lang, published_at, word_count, reading_minutes, headings_json
+			) VALUES (?, 'Sqlite date', '', '', '<p>x</p>', '', '', 'published', NULL, 'en',
+				'2020-06-01 08:00:00', 1, 1, '[]')`,
+		)
+			.bind(slug)
+			.run();
+		const row = await env.DB.prepare("SELECT id FROM posts WHERE slug = ?")
+			.bind(slug)
+			.first<{ id: number }>();
+		expect(row?.id).toBeDefined();
+		const res = await api.request(
+			`/admin/posts/${row?.id}`,
+			{ headers: { cookie } },
+			env,
+		);
+		expect(res.status).toBe(200);
+		expect(await res.json()).toMatchObject({
+			post: { publishedAt: "2020-06-01T08:00:00.000Z" },
+		});
+	});
+
 	it("returns 501 for AI stubs", { timeout: 30_000 }, async () => {
 		const cookie = await loginCookie();
 		const res = await api.request(

@@ -107,16 +107,19 @@ const { isNew, post } = Astro.props;
 	</label>
 	<label class="flex items-center gap-2 text-sm">
 		<input
+			checked
 			id="custom-published-at"
 			name="customPublishedAt"
 			type="checkbox"
 		/>
 		Custom published time
 	</label>
-	<label class="block text-sm" hidden id="published-at-wrap">
+	<label class="block text-sm" id="published-at-wrap">
 		Published at
 		<input
 			class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+			data-iso={post?.publishedAt ?? ""}
+			id="published-at"
 			name="publishedAt"
 			step="60"
 			type="datetime-local"
@@ -161,7 +164,7 @@ const { isNew, post } = Astro.props;
 	>
 	</div>
 </dialog>
-<script is:inline define:vars={{ isNew, postId: post?.id ?? null, publishedAtIso: post?.publishedAt ?? "" }}>
+<script is:inline define:vars={{ isNew, postId: post?.id ?? null }}>
 	const form = document.getElementById("post-form");
 	const errorEl = document.getElementById("form-error");
 	const dialog = document.getElementById("preview-dialog");
@@ -181,29 +184,36 @@ const { isNew, post } = Astro.props;
 			.replace(/^-+|-+$/g, "");
 	});
 
-	function isoToDatetimeLocal(iso) {
-		const d = new Date(iso);
-		if (Number.isNaN(d.getTime())) {
-			return "";
+	function parseStoredDate(value) {
+		if (!value) {
+			return null;
 		}
+		const d =
+			value.includes("T") || /(?:Z|[+-]\d{2}:\d{2})$/.test(value)
+				? new Date(value)
+				: new Date(`${value.replace(" ", "T")}Z`);
+		return Number.isNaN(d.getTime()) ? null : d;
+	}
+
+	function toDatetimeLocal(d) {
 		const pad = (n) => String(n).padStart(2, "0");
 		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 	}
 
-	const customToggle = form.elements.namedItem("customPublishedAt");
-	const publishedInput = form.elements.namedItem("publishedAt");
+	const customToggle = document.getElementById("custom-published-at");
+	const publishedInput = document.getElementById("published-at");
 	const publishedWrap = document.getElementById("published-at-wrap");
-	if (publishedAtIso) {
-		customToggle.checked = true;
-		publishedInput.value = isoToDatetimeLocal(publishedAtIso);
-	}
+	const storedPublished = parseStoredDate(
+		publishedInput.getAttribute("data-iso") ?? "",
+	);
+	publishedInput.value = toDatetimeLocal(storedPublished ?? new Date());
 	function syncPublishedAtUi() {
 		const on = customToggle.checked;
 		publishedWrap.hidden = !on;
 		publishedInput.disabled = !on;
 		publishedInput.required = on;
 		if (on && !publishedInput.value) {
-			publishedInput.value = isoToDatetimeLocal(new Date().toISOString());
+			publishedInput.value = toDatetimeLocal(new Date());
 		}
 	}
 	customToggle.addEventListener("change", syncPublishedAtUi);
