@@ -36,6 +36,68 @@ function loginRequest(
 
 describe("auth routes", () => {
 	it(
+		"creates the admin user on first setup and rejects a second call",
+		{ timeout: 30_000 },
+		async () => {
+			await env.DB.prepare("DELETE FROM sessions").run();
+			await env.DB.prepare("DELETE FROM users").run();
+			const ip = crypto.randomUUID();
+
+			const first = await api.request(
+				"/auth/setup",
+				{
+					method: "POST",
+					headers: {
+						"content-type": "application/json",
+						"CF-Connecting-IP": ip,
+					},
+					body: JSON.stringify({ password: "password1" }),
+				},
+				env,
+			);
+			expect(first.status).toBe(200);
+			expect(await first.json()).toEqual({ username: "admin" });
+			expect(sidCookie(first).startsWith("sid=")).toBe(true);
+
+			const second = await api.request(
+				"/auth/setup",
+				{
+					method: "POST",
+					headers: {
+						"content-type": "application/json",
+						"CF-Connecting-IP": ip,
+					},
+					body: JSON.stringify({ password: "password1" }),
+				},
+				env,
+			);
+			expect(second.status).toBe(409);
+
+			const login = await api.request(
+				"/auth/login",
+				loginRequest("admin", "password1", crypto.randomUUID()),
+				env,
+			);
+			expect(login.status).toBe(200);
+		},
+	);
+
+	it("rejects a short setup password", async () => {
+		await env.DB.prepare("DELETE FROM sessions").run();
+		await env.DB.prepare("DELETE FROM users").run();
+		const res = await api.request(
+			"/auth/setup",
+			{
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ password: "short" }),
+			},
+			env,
+		);
+		expect(res.status).toBe(400);
+	});
+
+	it(
 		"rejects a wrong password without setting a session cookie",
 		{ timeout: 30_000 },
 		async () => {
@@ -78,13 +140,15 @@ describe("auth routes", () => {
 			expect(me.status).toBe(200);
 			expect(await me.json()).toEqual({ username });
 
-			const ping = await api.request(
-				"/admin/ping",
+			const posts = await api.request(
+				"/admin/posts",
 				{ headers: { cookie } },
 				env,
 			);
-			expect(ping.status).toBe(200);
-			expect(await ping.json()).toEqual({ ok: true });
+			expect(posts.status).toBe(200);
+			expect(
+				Array.isArray(((await posts.json()) as { posts: unknown }).posts),
+			).toBe(true);
 
 			const logout = await api.request(
 				"/auth/logout",
@@ -103,8 +167,8 @@ describe("auth routes", () => {
 	);
 
 	it("returns 401 for /admin without a session, including unknown paths", async () => {
-		const ping = await api.request("/admin/ping", {}, env);
-		expect(ping.status).toBe(401);
+		const posts = await api.request("/admin/posts", {}, env);
+		expect(posts.status).toBe(401);
 		const missing = await api.request("/admin/does-not-exist", {}, env);
 		expect(missing.status).toBe(401);
 	});

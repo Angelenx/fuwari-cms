@@ -167,10 +167,10 @@
 - [x] 素页面：`/admin/login`（`fetch` + `location.assign`，避开 Swup）、`/admin` stub（当前用户 + 登出；阶段 4 换成文章列表）
 - [x] 登录限速：按 `CF-Connecting-IP` 的内存 Map，15 分钟 5 次失败 → 429（`ponytail:` isolate 不共享，升级 D1/KV）
 - [x] 登录成功时 `DELETE FROM sessions WHERE expires_at < datetime('now')`（与 INSERT 同 `batch`）
-- [x] `scripts/seed-admin.sql` + `pnpm db:seed:admin`（仅 `--local`）：`admin` / `local-dev-only`。测试自插用户，不读该文件。`vitest.config.ts` 注入测试用 `SESSION_SECRET`
-- [x] `tests/lib/password.test.ts`、`tests/api/auth.test.ts`：错密码无 Cookie、登录/me/logout、未登录 ping 401、第 6 次失败 429、种子 hash 可 verify
+- [x] ~~`scripts/seed-admin.sql` + `pnpm db:seed:admin`~~ **阶段 4 已删除**：空 `users` 表时首次访问 `/admin/login` 设密，用户名固定 `admin`
+- [x] `tests/lib/password.test.ts`、`tests/api/auth.test.ts`：错密码无 Cookie、登录/me/logout、未登录 `/api/admin/*` 401、第 6 次失败 429
 
-**验收**：错误密码 401；正确密码得 Cookie；带 Cookie 访问 `/api/auth/me` 返回用户；登出后再访问 401；无 Cookie 访问 `/admin` 到登录页、`/api/admin/ping` 401。 ✅ 2026-09-18
+**验收**：错误密码 401；正确密码得 Cookie；带 Cookie 访问 `/api/auth/me` 返回用户；登出后再访问 401；无 Cookie 访问 `/admin` 到登录页、`/api/admin/*` 401。 ✅ 2026-09-18
 
 ---
 
@@ -180,15 +180,16 @@
 
 **参考文档：** [Fuwari `astro.config.mjs` 插件链](https://github.com/saicaca/fuwari/blob/main/astro.config.mjs)、[Expressive Code rehype](https://expressive-code.com/installation/)、[`@astrojs/cloudflare` · 预编译](https://docs.astro.build/en/guides/integrations-guide/cloudflare/)、[Upgrade to v7 · unified Markdown](https://docs.astro.build/en/guides/upgrade-to/v7/)
 
-- [ ] `GET/POST /api/admin/posts`，`GET/PUT/DELETE /api/admin/posts/:id`
-- [ ] 写入时：校验 slug 唯一与格式；用 `unified` + Fuwari remark/rehype 插件 + `rehype-expressive-code` 渲染 `body_html`；计算 `word_count` / `reading_minutes`
-- [ ] **风险：** 在 workerd 验证 shiki / Expressive Code 可运行；不可则退化为纯 `<pre>`（记 `ponytail:`）
-- [ ] `/admin` 换成文章列表 + 快捷发布/撤回；`/admin/posts/new`、`/admin/posts/:id`（登录页已在阶段 3）
-- [ ] 编辑页：标题 / slug / 摘要 / 标签 / 封面 URL / 状态 / Markdown 大文本框 / 预览
-- [ ] `POST /api/admin/ai/*` 一律返回 `501`
-- [ ] Vitest：CRUD 全流程 + 未登录调用全部 401
+- [x] 首次设密：`POST /api/auth/setup`（密码 ≥ 8，用户名固定 `admin`）；`users` 已有行则 409。删除 `scripts/seed-admin.sql` / `db:seed:admin`。登录页按 `needsSetup()` 分支
+- [x] `GET/POST /api/admin/posts`，`GET/PUT/DELETE /api/admin/posts/:id`，`POST /api/admin/posts/preview`；草稿只走 `src/lib/admin-posts.ts`，公开查询仍只用 `src/lib/posts.ts`
+- [x] 写入时：校验 slug 唯一与 kebab 格式；`src/lib/markdown.ts` 用 `unified` + `remark-gfm` + 改编自 Fuwari 的 excerpt / reading-time 插件 + `rehype-slug` 渲染 `body_html`，并算 `word_count` / `reading_minutes` / `headings_json`
+- [x] **风险：** 未接入 `rehype-expressive-code` / shiki（`ponytail:` 围栏块为 `<pre><code>`；升级路径写在 `markdown.ts`）
+- [x] `/admin` 文章列表 + 快捷发布/撤回/删除；`/admin/posts/new` 与 `/admin/posts/:id` 共用编辑页。Swup `ignore` `/admin`
+- [x] 编辑页：标题 / slug / 摘要 / 标签 / 封面 URL / 状态 / Markdown 大文本框 / 预览
+- [x] `POST /api/admin/ai/:name` 一律返回 `501`
+- [x] Vitest：CRUD 全流程 + 未登录调用全部 401；markdown 渲染单测
 
-**验收**：后台发布一篇文章，公开站刷新即见；撤回为草稿后公开站消失。
+**验收**：后台发布一篇文章，公开站刷新即见；撤回为草稿后公开站消失。 ✅ 2026-09-18
 
 ---
 
@@ -234,6 +235,6 @@
 | 1 主题迁入 | `[x]` | 2026-09-17 |
 | 2 数据层 | `[x]` | 2026-09-18 |
 | 3 鉴权 | `[x]` | 2026-09-18 |
-| 4 后台 CRUD | `[ ]` | — |
+| 4 后台 CRUD | `[x]` | 2026-09-18 |
 | 5 MVP 部署 | `[ ]` | — |
 | 二期 | `[ ]` | — |

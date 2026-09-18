@@ -22,7 +22,9 @@ Copied verbatim, then adapted where noted:
 | `biome.json`, `tailwind.config.cjs` | unchanged |
 | `postcss.config.mjs`, `svelte.config.js` | inlined into `astro.config.mjs`, files removed |
 
-Not taken: `src/content/**` (Content Collections), `src/plugins/**` (remark/rehype/Expressive Code plugins; scheduled for the write-time Markdown renderer in PLAN.md phase 4), `astro.config.mjs` (rewritten), Pagefind wiring, `@astrojs/tailwind`, `@astrojs/sitemap`.
+Not taken: `src/content/**` (Content Collections), Fuwari admonition / GitHub-card / Expressive Code helpers (write-time renderer uses a smaller unified chain; see `src/plugins/README.md`), `astro.config.mjs` (rewritten), Pagefind wiring, `@astrojs/tailwind`, `@astrojs/sitemap`.
+
+Taken and adapted in phase 4: excerpt / reading-time remark plugins → `src/plugins/remark-excerpt.ts` and `src/plugins/remark-reading-time.ts` (they write `vfile.data` instead of Astro frontmatter).
 
 ## Notable adaptations
 

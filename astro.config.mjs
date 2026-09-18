@@ -41,6 +41,13 @@ export default defineConfig({
 			// the default value `transition-` cause transition delay
 			// when the Tailwind class `transition-all` is used
 			containers: ["main", "#toc"],
+			// Admin uses fetch + location.assign; a Swup visit would drop the session cookie dance.
+			ignore: (url) => {
+				const path = url.startsWith("http")
+					? new URL(url).pathname
+					: url.split("?")[0];
+				return path === "/admin" || path.startsWith("/admin/");
+			},
 			smoothScrolling: true,
 			cache: true,
 			preload: true,

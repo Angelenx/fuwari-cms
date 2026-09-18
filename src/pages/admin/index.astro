@@ -1,5 +1,6 @@
 ---
 import { env } from "cloudflare:workers";
+import { listAdminPosts } from "@lib/admin-posts";
 import { getSessionFromRequest } from "@lib/auth/session";
 import "@/styles/tailwind.css";
 
@@ -7,6 +8,8 @@ const user = await getSessionFromRequest(Astro.request, env);
 if (!user) {
 	return Astro.redirect("/admin/login");
 }
+
+const posts = await listAdminPosts();
 ---
 
 <html lang="en">
@@ -15,24 +18,124 @@ if (!user) {
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>Admin</title>
 	</head>
-	<body class="min-h-screen bg-zinc-100 text-zinc-900 flex items-center justify-center p-4">
-		<div class="w-full max-w-sm space-y-4 rounded-xl bg-white p-8 shadow">
-			<h1 class="text-lg font-medium">Signed in as {user.username}</h1>
-			<p class="text-sm text-zinc-600">
-				Post CRUD lands in phase 4. This page only proves the session guard works.
-			</p>
-			<button
-				id="logout"
-				class="w-full rounded bg-zinc-900 px-3 py-2 text-white"
-				type="button"
-			>
-				Log out
-			</button>
+	<body class="min-h-screen bg-zinc-100 text-zinc-900 p-4">
+		<div class="mx-auto max-w-4xl space-y-6">
+			<header class="flex flex-wrap items-center justify-between gap-3">
+				<div>
+					<h1 class="text-lg font-medium">Posts</h1>
+					<p class="text-sm text-zinc-600">Signed in as {user.username}</p>
+				</div>
+				<div class="flex gap-2">
+					<a
+						class="rounded bg-zinc-900 px-3 py-2 text-sm text-white"
+						href="/admin/posts/new"
+					>
+						New post
+					</a>
+					<button
+						id="logout"
+						class="rounded border border-zinc-300 bg-white px-3 py-2 text-sm"
+						type="button"
+					>
+						Log out
+					</button>
+				</div>
+			</header>
+			{
+				posts.length === 0 ? (
+					<p class="rounded-xl bg-white p-8 text-sm text-zinc-600 shadow">
+						No posts yet.
+					</p>
+				) : (
+					<div class="overflow-x-auto rounded-xl bg-white shadow">
+						<table class="w-full text-left text-sm">
+							<thead class="border-b border-zinc-200 text-zinc-500">
+								<tr>
+									<th class="px-4 py-3 font-medium">Title</th>
+									<th class="px-4 py-3 font-medium">Slug</th>
+									<th class="px-4 py-3 font-medium">Status</th>
+									<th class="px-4 py-3 font-medium">Updated</th>
+									<th class="px-4 py-3 font-medium">Actions</th>
+								</tr>
+							</thead>
+							<tbody>
+								{posts.map((post) => (
+									<tr class="border-b border-zinc-100 last:border-0">
+										<td class="px-4 py-3">
+											<a class="underline" href={`/admin/posts/${post.id}`}>
+												{post.title}
+											</a>
+										</td>
+										<td class="px-4 py-3 font-mono text-xs">{post.slug}</td>
+										<td class="px-4 py-3">{post.status}</td>
+										<td class="px-4 py-3 text-zinc-500">
+											{post.updatedAt ?? "—"}
+										</td>
+										<td class="px-4 py-3">
+											<div class="flex flex-wrap gap-2">
+												<button
+													class="rounded border border-zinc-300 px-2 py-1"
+													data-action="toggle"
+													data-id={post.id}
+													data-status={post.status}
+													type="button"
+												>
+													{post.status === "published" ? "Unpublish" : "Publish"}
+												</button>
+												<button
+													class="rounded border border-red-200 px-2 py-1 text-red-700"
+													data-action="delete"
+													data-id={post.id}
+													type="button"
+												>
+													Delete
+												</button>
+											</div>
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)
+			}
 		</div>
 		<script is:inline>
 			document.getElementById("logout").addEventListener("click", async () => {
 				await fetch("/api/auth/logout", { method: "POST" });
 				location.assign("/admin/login");
+			});
+			document.querySelectorAll("[data-action]").forEach((button) => {
+				button.addEventListener("click", async () => {
+					const id = button.getAttribute("data-id");
+					const action = button.getAttribute("data-action");
+					if (action === "delete") {
+						if (!confirm("Delete this post?")) {
+							return;
+						}
+						const res = await fetch(`/api/admin/posts/${id}`, { method: "DELETE" });
+						if (!res.ok) {
+							alert("Could not delete.");
+							return;
+						}
+						location.reload();
+						return;
+					}
+					const status =
+						button.getAttribute("data-status") === "published"
+							? "draft"
+							: "published";
+					const res = await fetch(`/api/admin/posts/${id}`, {
+						method: "PUT",
+						headers: { "content-type": "application/json" },
+						body: JSON.stringify({ status }),
+					});
+					if (!res.ok) {
+						alert("Could not update status.");
+						return;
+					}
+					location.reload();
+				});
 			});
 		</script>
 	</body>

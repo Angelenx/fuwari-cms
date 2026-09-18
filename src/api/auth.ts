@@ -1,7 +1,12 @@
 import { env } from "cloudflare:workers";
 import { Hono } from "hono";
-import { verifyPassword } from "../lib/auth/password";
+import { hashPassword, verifyPassword } from "../lib/auth/password";
 import { createSession, destroySession, getSession } from "../lib/auth/session";
+import {
+	ADMIN_USERNAME,
+	MIN_PASSWORD_LENGTH,
+	needsSetup,
+} from "../lib/auth/setup";
 import type { AppEnv } from "./env";
 
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
@@ -43,16 +48,66 @@ type UserRow = {
 	password_hash: string;
 };
 
-type LoginBody = {
-	username: unknown;
-	password: unknown;
-};
-
-function isLoginBody(value: unknown): value is LoginBody {
+function jsonBody(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
 }
 
 export const auth = new Hono<AppEnv>()
+	.post("/setup", async (c) => {
+		const ip = clientIp(c);
+		if (tooManyAttempts(ip)) {
+			return c.json({ error: "Too many attempts" }, 429);
+		}
+
+		let body: unknown;
+		try {
+			body = await c.req.json();
+		} catch {
+			return c.json({ error: "Invalid JSON" }, 400);
+		}
+		if (!jsonBody(body) || typeof body.password !== "string") {
+			return c.json({ error: "Invalid body" }, 400);
+		}
+		if (body.password.length < MIN_PASSWORD_LENGTH) {
+			return c.json(
+				{
+					error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+				},
+				400,
+			);
+		}
+
+		if (!(await needsSetup())) {
+			return c.json({ error: "Admin already exists" }, 409);
+		}
+
+		const passwordHash = await hashPassword(body.password);
+		try {
+			await env.DB.prepare(
+				"INSERT INTO users (username, password_hash) VALUES (?, ?)",
+			)
+				.bind(ADMIN_USERNAME, passwordHash)
+				.run();
+		} catch (err) {
+			// Unique race: another isolate created admin first.
+			if (String(err).includes("UNIQUE")) {
+				return c.json({ error: "Admin already exists" }, 409);
+			}
+			throw err;
+		}
+		const created = await env.DB.prepare(
+			"SELECT id FROM users WHERE username = ?",
+		)
+			.bind(ADMIN_USERNAME)
+			.first<{ id: number }>();
+		if (!created) {
+			return c.json({ error: "Setup failed" }, 500);
+		}
+
+		loginFailures.delete(ip);
+		await createSession(c, created.id);
+		return c.json({ username: ADMIN_USERNAME });
+	})
 	.post("/login", async (c) => {
 		const ip = clientIp(c);
 		if (tooManyAttempts(ip)) {
@@ -66,7 +121,7 @@ export const auth = new Hono<AppEnv>()
 			return c.json({ error: "Invalid JSON" }, 400);
 		}
 		if (
-			!isLoginBody(body) ||
+			!jsonBody(body) ||
 			typeof body.username !== "string" ||
 			typeof body.password !== "string"
 		) {

@@ -1,72 +1,146 @@
 ---
-// Bare page (no Fuwari grid). fetch + location.assign so Swup does not intercept.
+import {
+	ADMIN_USERNAME,
+	MIN_PASSWORD_LENGTH,
+	needsSetup,
+} from "@lib/auth/setup";
 import "@/styles/tailwind.css";
+
+const setup = await needsSetup();
 ---
 
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>Admin login</title>
+		<title>{setup ? "Create admin password" : "Admin login"}</title>
 	</head>
 	<body class="min-h-screen bg-zinc-100 text-zinc-900 flex items-center justify-center p-4">
-		<form
-			id="login-form"
-			class="w-full max-w-sm space-y-4 rounded-xl bg-white p-8 shadow"
-		>
-			<h1 class="text-lg font-medium">Sign in</h1>
-			<label class="block text-sm">
-				Username
-				<input
-					class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
-					name="username"
-					autocomplete="username"
-					required
-				/>
-			</label>
-			<label class="block text-sm">
-				Password
-				<input
-					class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
-					type="password"
-					name="password"
-					autocomplete="current-password"
-					required
-				/>
-			</label>
-			<p id="login-error" class="hidden text-sm text-red-600"></p>
-			<button
-				class="w-full rounded bg-zinc-900 px-3 py-2 text-white"
-				type="submit"
-			>
-				Sign in
-			</button>
-		</form>
-		<script is:inline>
-			const form = document.getElementById("login-form");
-			const errorEl = document.getElementById("login-error");
-			form.addEventListener("submit", async (event) => {
-				event.preventDefault();
-				errorEl.classList.add("hidden");
-				const data = new FormData(form);
-				const res = await fetch("/api/auth/login", {
-					method: "POST",
-					headers: { "content-type": "application/json" },
-					body: JSON.stringify({
-						username: data.get("username"),
-						password: data.get("password"),
-					}),
+		{
+			setup ? (
+				<form
+					id="setup-form"
+					class="w-full max-w-sm space-y-4 rounded-xl bg-white p-8 shadow"
+				>
+					<h1 class="text-lg font-medium">Create admin password</h1>
+					<p class="text-sm text-zinc-600">
+						Username is <code>{ADMIN_USERNAME}</code>. This runs once, when the users table is empty.
+					</p>
+					<label class="block text-sm">
+						Password
+						<input
+							class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
+							type="password"
+							name="password"
+							autocomplete="new-password"
+							minlength={MIN_PASSWORD_LENGTH}
+							required
+						/>
+					</label>
+					<label class="block text-sm">
+						Confirm password
+						<input
+							class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
+							type="password"
+							name="confirm"
+							autocomplete="new-password"
+							minlength={MIN_PASSWORD_LENGTH}
+							required
+						/>
+					</label>
+					<p id="form-error" class="hidden text-sm text-red-600"></p>
+					<button
+						class="w-full rounded bg-zinc-900 px-3 py-2 text-white"
+						type="submit"
+					>
+						Create password
+					</button>
+				</form>
+			) : (
+				<form
+					id="login-form"
+					class="w-full max-w-sm space-y-4 rounded-xl bg-white p-8 shadow"
+				>
+					<h1 class="text-lg font-medium">Sign in</h1>
+					<p class="text-sm text-zinc-600">
+						Username: <code>{ADMIN_USERNAME}</code>
+					</p>
+					<label class="block text-sm">
+						Password
+						<input
+							class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
+							type="password"
+							name="password"
+							autocomplete="current-password"
+							required
+						/>
+					</label>
+					<p id="form-error" class="hidden text-sm text-red-600"></p>
+					<button
+						class="w-full rounded bg-zinc-900 px-3 py-2 text-white"
+						type="submit"
+					>
+						Sign in
+					</button>
+				</form>
+			)
+		}
+		<script is:inline define:vars={{ setup, username: ADMIN_USERNAME }}>
+			const errorEl = document.getElementById("form-error");
+			if (setup) {
+				const form = document.getElementById("setup-form");
+				form.addEventListener("submit", async (event) => {
+					event.preventDefault();
+					errorEl.classList.add("hidden");
+					const data = new FormData(form);
+					const password = String(data.get("password") ?? "");
+					const confirm = String(data.get("confirm") ?? "");
+					if (password !== confirm) {
+						errorEl.textContent = "Passwords do not match.";
+						errorEl.classList.remove("hidden");
+						return;
+					}
+					const res = await fetch("/api/auth/setup", {
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: JSON.stringify({ password }),
+					});
+					if (!res.ok) {
+						const body = await res.json().catch(() => ({}));
+						errorEl.textContent =
+							typeof body.error === "string"
+								? body.error
+								: "Could not create the admin password.";
+						errorEl.classList.remove("hidden");
+						return;
+					}
+					location.assign("/admin");
 				});
-				if (!res.ok) {
-					errorEl.textContent =
-						res.status === 429
-							? "Too many attempts. Try again later."
-							: "Invalid credentials.";
-					errorEl.classList.remove("hidden");
-					return;
-				}
-				location.assign("/admin");
-			});
+			} else {
+				const form = document.getElementById("login-form");
+				form.addEventListener("submit", async (event) => {
+					event.preventDefault();
+					errorEl.classList.add("hidden");
+					const data = new FormData(form);
+					const res = await fetch("/api/auth/login", {
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: JSON.stringify({
+							username,
+							password: data.get("password"),
+						}),
+					});
+					if (!res.ok) {
+						errorEl.textContent =
+							res.status === 429
+								? "Too many attempts. Try again later."
+								: "Invalid credentials.";
+						errorEl.classList.remove("hidden");
+						return;
+					}
+					location.assign("/admin");
+				});
+			}
 		</script>
 	</body>
 </html>

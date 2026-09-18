@@ -14,11 +14,6 @@ describe("PBKDF2 password hashes", () => {
 			expect(await verifyPassword("correct horse", a)).toBe(true);
 			expect(await verifyPassword("wrong", a)).toBe(false);
 			expect(await verifyPassword("correct horse", undefined)).toBe(false);
-
-			// Lock scripts/seed-admin.sql to this hasher so local `pnpm db:seed:admin` stays loginable.
-			const seedHash =
-				"pbkdf2$sha256$100000$8rbgnCaXYTl_-p3AF-H-Dw$FICnPquEMuviyRM6giLft37v_El1CLlFO_O6hvMIm2Q";
-			expect(await verifyPassword("local-dev-only", seedHash)).toBe(true);
 		},
 	);
 });
