@@ -54,11 +54,11 @@ describe("admin post CRUD", () => {
 				},
 			],
 			[
-				"/admin/posts/preview",
+				"/admin/preview",
 				{
 					method: "POST",
 					headers: { "content-type": "application/json" },
-					body: '{"bodyMd":"x"}',
+					body: '{"body_md":"x"}',
 				},
 			],
 			["/admin/posts/1", {}],
@@ -117,8 +117,8 @@ describe("admin post CRUD", () => {
 			expect(listedBody.posts.some((p) => p.id === id)).toBe(true);
 
 			const preview = await api.request(
-				"/admin/posts/preview",
-				jsonInit(cookie, "POST", { bodyMd: "# Preview\n\nHi.\n" }),
+				"/admin/preview",
+				jsonInit(cookie, "POST", { body_md: "# Preview\n\nHi.\n" }),
 				env,
 			);
 			expect(preview.status).toBe(200);

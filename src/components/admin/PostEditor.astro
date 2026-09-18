@@ -1,0 +1,210 @@
+---
+import type { AdminPost } from "@lib/admin-posts";
+
+interface Props {
+	isNew: boolean;
+	post?: AdminPost;
+	username: string;
+}
+
+const { isNew, post, username } = Astro.props;
+---
+
+<div class="mx-auto max-w-5xl space-y-6">
+	<header class="flex flex-wrap items-center justify-between gap-3">
+		<div>
+			<h1 class="text-lg font-medium">{isNew ? "New post" : "Edit post"}</h1>
+			<p class="text-sm text-zinc-600">
+				<a class="underline" href="/admin">All posts</a>
+				· {username}
+			</p>
+		</div>
+		<button
+			id="logout"
+			class="rounded border border-zinc-300 bg-white px-3 py-2 text-sm"
+			type="button"
+		>
+			Log out
+		</button>
+	</header>
+	<form id="post-form" class="grid gap-4 lg:grid-cols-2">
+		<div class="space-y-3 rounded-xl bg-white p-6 shadow">
+			<label class="block text-sm">
+				Title
+				<input
+					class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
+					name="title"
+					required
+					value={post?.title ?? ""}
+				/>
+			</label>
+			<label class="block text-sm">
+				Slug
+				<input
+					class="mt-1 w-full rounded border border-zinc-300 px-3 py-2 font-mono text-sm"
+					name="slug"
+					pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+					required
+					value={post?.slug ?? ""}
+				/>
+			</label>
+			<label class="block text-sm">
+				Description
+				<input
+					class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
+					name="description"
+					value={post?.description ?? ""}
+				/>
+			</label>
+			<label class="block text-sm">
+				Tags (comma separated)
+				<input
+					class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
+					name="tags"
+					value={post?.tags.join(", ") ?? ""}
+				/>
+			</label>
+			<label class="block text-sm">
+				Category
+				<input
+					class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
+					name="category"
+					value={post?.category ?? ""}
+				/>
+			</label>
+			<label class="block text-sm">
+				Cover URL
+				<input
+					class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
+					name="coverUrl"
+					value={post?.coverUrl ?? ""}
+				/>
+			</label>
+			<label class="block text-sm">
+				Lang
+				<input
+					class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
+					name="lang"
+					value={post?.lang ?? "en"}
+				/>
+			</label>
+			<label class="block text-sm">
+				Status
+				<select
+					class="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
+					name="status"
+				>
+					<option selected={post?.status !== "published"} value="draft">
+						draft
+					</option>
+					<option selected={post?.status === "published"} value="published">
+						published
+					</option>
+				</select>
+			</label>
+			<label class="block text-sm">
+				Markdown
+				<textarea
+					class="mt-1 min-h-64 w-full rounded border border-zinc-300 px-3 py-2 font-mono text-sm"
+					name="bodyMd"
+				>{post?.bodyMd ?? ""}</textarea>
+			</label>
+			<p id="form-error" class="hidden text-sm text-red-600"></p>
+			<div class="flex flex-wrap gap-2">
+				<button
+					class="rounded bg-zinc-900 px-3 py-2 text-sm text-white"
+					type="submit"
+				>
+					Save
+				</button>
+				<button
+					class="rounded border border-zinc-300 px-3 py-2 text-sm"
+					id="preview-btn"
+					type="button"
+				>
+					Preview
+				</button>
+			</div>
+		</div>
+		<div class="rounded-xl bg-white p-6 shadow">
+			<h2 class="mb-3 text-sm font-medium text-zinc-500">Preview</h2>
+			<div id="preview" class="prose max-w-none text-sm"></div>
+		</div>
+	</form>
+</div>
+<script is:inline define:vars={{ isNew, postId: post?.id ?? null }}>
+	const form = document.getElementById("post-form");
+	const errorEl = document.getElementById("form-error");
+	const titleInput = form.elements.namedItem("title");
+	const slugInput = form.elements.namedItem("slug");
+	let slugTouched = !isNew;
+	slugInput.addEventListener("input", () => {
+		slugTouched = true;
+	});
+	titleInput.addEventListener("input", () => {
+		if (slugTouched) {
+			return;
+		}
+		slugInput.value = titleInput.value
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-+|-+$/g, "");
+	});
+
+	function payload() {
+		const data = new FormData(form);
+		const tags = String(data.get("tags") ?? "")
+			.split(",")
+			.map((item) => item.trim())
+			.filter(Boolean);
+		return {
+			title: data.get("title"),
+			slug: data.get("slug"),
+			description: data.get("description"),
+			tags,
+			category: String(data.get("category") ?? "").trim() || null,
+			coverUrl: data.get("coverUrl"),
+			lang: data.get("lang"),
+			status: data.get("status"),
+			bodyMd: data.get("bodyMd"),
+		};
+	}
+
+	async function preview() {
+		const res = await fetch("/api/admin/preview", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ body_md: payload().bodyMd }),
+		});
+		if (!res.ok) {
+			return;
+		}
+		const body = await res.json();
+		document.getElementById("preview").innerHTML = body.bodyHtml ?? "";
+	}
+
+	document.getElementById("preview-btn").addEventListener("click", preview);
+	document.getElementById("logout").addEventListener("click", async () => {
+		await fetch("/api/auth/logout", { method: "POST" });
+		location.assign("/admin/login");
+	});
+
+	form.addEventListener("submit", async (event) => {
+		event.preventDefault();
+		errorEl.classList.add("hidden");
+		const url = isNew ? "/api/admin/posts" : `/api/admin/posts/${postId}`;
+		const res = await fetch(url, {
+			method: isNew ? "POST" : "PUT",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify(payload()),
+		});
+		const body = await res.json().catch(() => ({}));
+		if (!res.ok) {
+			errorEl.textContent =
+				typeof body.error === "string" ? body.error : "Could not save.";
+			errorEl.classList.remove("hidden");
+			return;
+		}
+		location.assign(`/admin/posts/${body.post.id}`);
+	});
+</script>

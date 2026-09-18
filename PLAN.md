@@ -181,10 +181,10 @@
 **参考文档：** [Fuwari `astro.config.mjs` 插件链](https://github.com/saicaca/fuwari/blob/main/astro.config.mjs)、[Expressive Code rehype](https://expressive-code.com/installation/)、[`@astrojs/cloudflare` · 预编译](https://docs.astro.build/en/guides/integrations-guide/cloudflare/)、[Upgrade to v7 · unified Markdown](https://docs.astro.build/en/guides/upgrade-to/v7/)
 
 - [x] 首次设密：`POST /api/auth/setup`（密码 ≥ 8，用户名固定 `admin`）；`users` 已有行则 409。删除 `scripts/seed-admin.sql` / `db:seed:admin`。登录页按 `needsSetup()` 分支
-- [x] `GET/POST /api/admin/posts`，`GET/PUT/DELETE /api/admin/posts/:id`，`POST /api/admin/posts/preview`；草稿只走 `src/lib/admin-posts.ts`，公开查询仍只用 `src/lib/posts.ts`
-- [x] 写入时：校验 slug 唯一与 kebab 格式；`src/lib/markdown.ts` 用 `unified` + `remark-gfm` + 改编自 Fuwari 的 excerpt / reading-time 插件 + `rehype-slug` 渲染 `body_html`，并算 `word_count` / `reading_minutes` / `headings_json`
-- [x] **风险：** 未接入 `rehype-expressive-code` / shiki（`ponytail:` 围栏块为 `<pre><code>`；升级路径写在 `markdown.ts`）
-- [x] `/admin` 文章列表 + 快捷发布/撤回/删除；`/admin/posts/new` 与 `/admin/posts/:id` 共用编辑页。Swup `ignore` `/admin`
+- [x] `GET/POST /api/admin/posts`，`GET/PUT/DELETE /api/admin/posts/:id`，`POST /api/admin/preview`；草稿只走 `src/lib/admin-posts.ts`，公开查询仍只用 `src/lib/posts.ts`
+- [x] 写入时：校验 slug 唯一与 kebab 格式；`src/lib/markdown.ts` 用 `unified` + `remark-gfm` / `remark-math` + 改编自 Fuwari 的 excerpt / reading-time 插件 + `rehype-katex` / `rehype-slug` 渲染 `body_html`，并算 `word_count` / `reading_minutes` / `headings_json`
+- [x] **风险：** 未接入 `rehype-expressive-code` / shiki（`ponytail:` 围栏块为 `<pre><code>`；升级路径写在 `markdown.ts`）。Fuwari admonition / GitHub card 已拷入 `src/plugins/` 但未接线
+- [x] `/admin` 文章列表 + 快捷发布/撤回/删除；`/admin/posts/new`、`/admin/posts/:id`。Swup `ignore` `/admin`
 - [x] 编辑页：标题 / slug / 摘要 / 标签 / 封面 URL / 状态 / Markdown 大文本框 / 预览
 - [x] `POST /api/admin/ai/:name` 一律返回 `501`
 - [x] Vitest：CRUD 全流程 + 未登录调用全部 401；markdown 渲染单测

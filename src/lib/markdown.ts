@@ -4,13 +4,15 @@
  * ponytail: Fuwari admonition / GitHub-card / Expressive Code plugins are not
  * wired here — they expect Astro's markdown pipeline (or shiki in workerd).
  * Fence blocks become `<pre><code>`. Upgrade: rehype-expressive-code after it
- * runs in workerd, then src/plugins/rehype-component-*.
+ * runs in workerd, then wire src/plugins/rehype-component-* via rehype-components.
  */
 import type { MarkdownHeading } from "astro";
 import { toString as hastToString } from "hast-util-to-string";
+import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
 import rehypeStringify from "rehype-stringify";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { type Plugin, unified } from "unified";
@@ -54,9 +56,11 @@ function rehypeCollectHeadings() {
 const processor = unified()
 	.use(remarkParse)
 	.use(remarkGfm)
+	.use(remarkMath)
 	.use(remarkExcerpt as Plugin)
 	.use(remarkReadingTime as Plugin)
 	.use(remarkRehype)
+	.use(rehypeKatex)
 	.use(rehypeSlug)
 	.use(rehypeCollectHeadings as Plugin)
 	.use(rehypeStringify);

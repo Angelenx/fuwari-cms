@@ -28,6 +28,11 @@ const n = 1;
 		expect(result.readingMinutes).toBeGreaterThanOrEqual(1);
 	});
 
+	it("renders KaTeX for math", async () => {
+		const result = await renderMarkdown("Euler: $x^2$");
+		expect(result.bodyHtml).toContain("katex");
+	});
+
 	it("counts CJK characters as words", async () => {
 		const result = await renderMarkdown("你好世界");
 		expect(result.wordCount).toBe(4);

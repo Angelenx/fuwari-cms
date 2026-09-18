@@ -1,7 +1,6 @@
 ---
 import { env } from "cloudflare:workers";
 import PostEditor from "@components/admin/PostEditor.astro";
-import { getAdminPost } from "@lib/admin-posts";
 import { getSessionFromRequest } from "@lib/auth/session";
 import "@/styles/tailwind.css";
 
@@ -9,24 +8,15 @@ const user = await getSessionFromRequest(Astro.request, env);
 if (!user) {
 	return Astro.redirect("/admin/login");
 }
-
-const rawId = Astro.params.id ?? "";
-if (!/^[1-9]\d*$/.test(rawId)) {
-	return new Response("Not Found", { status: 404 });
-}
-const post = await getAdminPost(Number(rawId));
-if (!post) {
-	return new Response("Not Found", { status: 404 });
-}
 ---
 
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>Edit {post.title}</title>
+		<title>New post</title>
 	</head>
 	<body class="min-h-screen bg-zinc-100 text-zinc-900 p-4">
-		<PostEditor isNew={false} post={post} username={user.username} />
+		<PostEditor isNew username={user.username} />
 	</body>
 </html>

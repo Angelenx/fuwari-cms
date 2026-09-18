@@ -182,18 +182,6 @@ const posts = new Hono<AppEnv>()
 	.get("/", async (c) => {
 		return c.json({ posts: await listAdminPosts() });
 	})
-	.post("/preview", async (c) => {
-		let body: unknown;
-		try {
-			body = await c.req.json();
-		} catch {
-			return c.json({ error: "Invalid JSON" }, 400);
-		}
-		if (!jsonBody(body) || typeof body.bodyMd !== "string") {
-			return c.json({ error: "Invalid body" }, 400);
-		}
-		return c.json(await renderMarkdown(body.bodyMd));
-	})
 	.post("/", async (c) => {
 		let body: unknown;
 		try {
@@ -273,6 +261,27 @@ export const admin = new Hono<AppEnv>()
 			return c.json({ error: "Unauthorized" }, 401);
 		}
 		await next();
+	})
+	.post("/preview", async (c) => {
+		let body: unknown;
+		try {
+			body = await c.req.json();
+		} catch {
+			return c.json({ error: "Invalid JSON" }, 400);
+		}
+		if (!jsonBody(body)) {
+			return c.json({ error: "Invalid body" }, 400);
+		}
+		const markdown =
+			typeof body.body_md === "string"
+				? body.body_md
+				: typeof body.bodyMd === "string"
+					? body.bodyMd
+					: undefined;
+		if (markdown === undefined) {
+			return c.json({ error: "Invalid body" }, 400);
+		}
+		return c.json(await renderMarkdown(markdown));
 	})
 	.all("/ai/:name", (c) => c.json({ error: "Not Implemented" }, 501))
 	.route("/posts", posts)
