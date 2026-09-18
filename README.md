@@ -197,54 +197,181 @@ openssl rand -base64 32
 
 ## 部署
 
-本仓库**不代为执行**远端 `deploy` / `secret put` / `migrations apply --remote`。按下面做完，Worker 才会在 Cloudflare 上跑起来。
+本仓库**不代为执行**远端 `deploy` / `secret put` / `migrations apply --remote`。下面做完，才会出现 `*.workers.dev` 上的公开站和 `/admin`。
 
-两种方法共用同一套前置。
+本地 `pnpm dev` 用的是 Wrangler 在 `.wrangler/` 里的 **本机 SQLite**，和 Cloudflare 上的 D1 **不是同一份库**：本机迁过表、写过文章、设过密码，线上都不会自动带过去。线上文章表一开始是空的（这是预期；空库不会自动灌示例稿，也不要跑 `pnpm db:seed:local`）。
 
-### 前置
+两种方法共用下面 0–4；方法 A 在本机把 Worker 推上去，方法 B 用 GitHub Actions 做同一件事。
 
-1. Cloudflare 账号；本机 Node ≥ 22.12 + Corepack pnpm 9。
-2. `pnpm exec wrangler login`（方法 B 用 API Token，见下）。
-3. 创建远端库并把 **真实 `database_id` 写进** [`wrangler.jsonc`](./wrangler.jsonc)，替换占位 `00000000-0000-0000-0000-000000000000`：
+### 0. 本机与账号
+
+1. Cloudflare 账号（免费计划即可；D1 + Workers 都在账号里）。
+2. Node ≥ 22.12；pnpm 9 用 Corepack（见「本地开发」）。在仓库根目录 `pnpm install`。
+3. 登录 Wrangler（浏览器 OAuth）。若提示 `Timed out waiting for authorization code`，重新执行一次，登录页要在超时前点允许：
+
+```sh
+pnpm exec wrangler login
+```
+
+方法 B 不依赖本机 OAuth，改用 API Token（见该方法）。`wrangler whoami` 可确认当前账号。
+
+Worker 名来自 [`wrangler.jsonc`](./wrangler.jsonc) 的 `"name"`（默认 `fuwari-cms`）。部署成功后的地址形如 `https://fuwari-cms.<你的子域>.workers.dev`，以命令行打印的 URL 为准。若该名已被占用，改 `name` 再部署。
+
+### 1. 创建远端 D1，并改配置
+
+库名与 jsonc 里的 `database_name` 一致即可（默认 `fuwari-cms`）：
 
 ```sh
 pnpm exec wrangler d1 create fuwari-cms
 ```
 
-4. 配 `SESSION_SECRET`（见上一节）。本地 `.dev.vars` 与生产 secret **互不影响**。
-5. 把 [`migrations/`](./migrations/) 打到**远端** D1（本地 `pnpm db:migrate:local` 不会同步上去）：
+成功时会打印 `database_id`（一段 UUID）。**同一账号里这个名字只能建一次**；已经有了就不要再 create，改用：
+
+```sh
+pnpm exec wrangler d1 list
+```
+
+从列表抄 ID。
+
+#### 不要让 CLI 再追加一条 binding
+
+新版 Wrangler 成功后会问 *Would you like Wrangler to add it on your behalf?*
+
+- 选 **no**，自己改 jsonc（推荐）。
+- 若选了 **yes**：它会**再追加**一段，绑定名往往是 `fuwari_cms`，**不会**改你原来的 `DB`。代码和测试用的是 `env.DB`，多出来的那段没用，占位 ID 还在的话线上仍指错库。
+
+无论选了什么，最后 [`wrangler.jsonc`](./wrangler.jsonc) 的 `d1_databases` **只能有一条**，并且必须是：
+
+```jsonc
+"d1_databases": [
+  {
+    "binding": "DB",
+    "database_name": "fuwari-cms",
+    "database_id": "把-create-或-list-打印的-UUID-贴这里",
+    "migrations_dir": "migrations"
+  }
+]
+```
+
+要点：
+
+- `binding` 必须是 **`DB`**，不要用 CLI 建议的 `fuwari_cms`。
+- 用真实 UUID **替换**占位 `00000000-0000-0000-0000-000000000000`，不要并存两段。
+- **留下** `"migrations_dir": "migrations"`，否则 `pnpm db:migrate:remote` 找不到 SQL。
+- 若 CLI 还问本地是否连远端资源：选 **no**。`pnpm dev` 继续用本机 SQLite；远端库只给生产 Worker 用。
+- `database_id` **可以提交到 Git**（它不是密钥，只是告诉 Wrangler 绑哪座库）。
+
+### 2. 给生产 Worker 配 `SESSION_SECRET`
+
+这一项只存在 Cloudflare 的 Worker secrets 里，**不要**写进 jsonc、不要写进 GitHub Actions 的 `env` / `vars`。本地 `.dev.vars` 只给 `pnpm dev` 用，**不会**随 `pnpm run deploy` 上传。
+
+先生成一串随机值（见上一节「环境变量与绑定」），再执行：
+
+```sh
+pnpm exec wrangler secret put SESSION_SECRET
+```
+
+CLI 会停在 `Enter a secret value:`，输入被星号挡住，这是正常交互：把密钥**粘贴进去后回车**。成功后会提示已上传。没有这一步时，jsonc 里 `secrets.required` 会让部署直接失败。
+
+生产密钥建议和本地 `.dev.vars` **不是同一串**。以后若要轮换，再 `secret put` 一次即可；旧的 `sid` Cookie 会立刻失效，需要重新登录。
+
+### 3. 把表结构打到远端 D1
 
 ```sh
 pnpm db:migrate:remote
 ```
 
-6. 部署成功后打开 `https://<worker-name>.workers.dev/admin/login`，为 `admin` 设密码。可选：Dashboard → Workers → 自定义域。
+等价于 `wrangler d1 migrations apply fuwari-cms --remote`，读取仓库 [`migrations/`](./migrations/)（`0001`–`0004`）。`pnpm db:migrate:local` **只改本机**，不会同步到线上。
 
-不要对远端执行 `pnpm db:seed:local` / `scripts/seed.sql`。
+**禁止**对远端执行 `pnpm db:seed:local` 或 `scripts/seed.sql`（那是本地演示稿）。线上贴文表为空是正常的，在 `/admin` 里自己写。
 
-### 方法 A — 本机 Wrangler（推荐）
+若报找不到 database / unauthorized：回头核对 `database_id`、`wrangler login` 的账号是否就是建库的那个。
+
+### 4. 推送 Worker（方法 A，推荐）
 
 ```sh
-pnpm install
-# 已完成：wrangler.jsonc 里的 database_id、pnpm db:migrate:remote
-pnpm exec wrangler secret put SESSION_SECRET
 pnpm run deploy
 ```
 
-必须写 `pnpm run deploy`：pnpm 9 把裸的 `pnpm deploy` 当成 workspace 拷包命令，会报 `ERR_PNPM_CANNOT_DEPLOY`。脚本内容是 `pnpm build` + `wrangler deploy`。之后改代码再执行一次 `pnpm run deploy` 即可；库结构变了再跑 `pnpm db:migrate:remote`。
+**必须带 `run`。** pnpm 9 把裸的 `pnpm deploy` 当成「从 workspace 拷包」，会报 `ERR_PNPM_CANNOT_DEPLOY`。`package.json` 里这个脚本是 `pnpm build`（`wrangler types` + `astro check` + `astro build`）再 `wrangler deploy`。
+
+首次建议按 1 → 2 → 3 → 4 的顺序。之后：
+
+| 你改了什么 | 做什么 |
+|------------|--------|
+| 页面 / API / 主题 | 再 `pnpm run deploy` |
+| `migrations/` 新文件 | 先 `pnpm db:migrate:remote`，再按需 deploy |
+| 只改 `SESSION_SECRET` | 再 `secret put`，不用重新 build |
+
+部署结束时终端会给出 `*.workers.dev` URL。
+
+### 5. 上线后第一次打开
+
+1. 浏览器打开 `https://<上面打印的主机>/admin/login`。
+2. `users` 为空时进入**设密**：用户名固定 `admin`，密码 ≥ 8。这是写进**远端** D1 的，和本机 `/admin/login` 那套密码无关。
+3. 登录后：`/admin` 写文章，`/admin/profile` / `site` / `about` 改资料。空字段回退 [`src/config.ts`](./src/config.ts)。
+4. 公开首页、归档、标签应能打开；草稿不会出现在未登录的公开列表。
+5. 可选：Cloudflare Dashboard → Workers → 该 Worker → 自定义域（按 Dashboard 指引做 DNS）。自定义域同样走这个 Worker，后台路径仍是 `/admin/login`。
 
 ### 方法 B — GitHub Actions
 
-适合每次 push 自动发版。本仓库**不附带** workflow 文件（避免未配 Token 时 CI 变红）；在仓库里自行添加即可。
+适合每次 push 自动发版。本仓库**不附带** `.github/workflows` 文件（避免没配 Token 时 CI 变红）；需要时自己加。
 
-1. Cloudflare Dashboard → 创建 API Token，权限至少包含 **Workers Scripts 编辑** 与 **D1 编辑**。
-2. GitHub 仓库 Secrets：
+1. Cloudflare Dashboard → **My Profile / API Tokens** → Create Token。权限至少：
+   - Account · **Workers Scripts** · Edit
+   - Account · **D1** · Edit  
+   Account ID 在 Dashboard 右侧或 Workers 概览页。
+2. GitHub 仓库 **Settings → Secrets and variables → Actions** 增加：
    - `CLOUDFLARE_API_TOKEN`
    - `CLOUDFLARE_ACCOUNT_ID`
-3. **`SESSION_SECRET` 仍用方法 A 的 `wrangler secret put` 配在 Worker 上**，不要当作构建时环境变量写进 GitHub Secrets（以免进日志或被误当成 `vars`）。
-4. 工作流建议：`pnpm install` → `pnpm build` → `pnpm db:migrate:remote` → `pnpm exec wrangler deploy`。首次建议 `workflow_dispatch` 手动点一次。
+3. **`SESSION_SECRET` 仍然只通过方法 A 的 `wrangler secret put` 配在 Worker 上**（做一次即可，与 CI 无关）。不要把它放进 GitHub Secrets 再当构建 `vars` 注入——容易进日志，也会被误当成明文环境变量。`wrangler secret bulk` 同理，除非你清楚风险。
+4. [`wrangler.jsonc`](./wrangler.jsonc) 的 `database_id` 必须已是真实 ID 并已提交；密钥不能提交。
+5. 工作流建议：`pnpm install` → `pnpm build` → `pnpm db:migrate:remote` → `pnpm exec wrangler deploy`。首次用 `workflow_dispatch` 手动点一次，确认过再加 `push`。
 
-[`wrangler.jsonc`](./wrangler.jsonc) 的 `database_id` 必须已是真实 ID（可提交）；密钥不能提交。
+示例（自行保存为 `.github/workflows/deploy.yml`）：
+
+```yaml
+name: Deploy
+on:
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm db:migrate:remote
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - run: pnpm exec wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+```
+
+CI 里不要写 `pnpm deploy`（同样会撞上 pnpm 内置命令）；也不要跑 `db:seed:local`。
+
+### 常见问题
+
+| 现象 | 原因 / 处理 |
+|------|----------------|
+| `ERR_PNPM_CANNOT_DEPLOY` | 写成了 `pnpm deploy`，改用 `pnpm run deploy`。 |
+| `Enter a secret value:` 一直转圈 | `secret put` 在等粘贴密钥，粘贴后回车，不是卡死。 |
+| jsonc 里出现两段 `d1_databases` | CLI 自动追加了 `fuwari_cms`。删掉那段，把 UUID 写进原来的 `DB`。 |
+| 部署报缺 `SESSION_SECRET` | 还没 `secret put`，或 put 到了别的账号 / 别的 Worker 名。 |
+| 线上没有文章 / 没有管理员 | 远端是空库。不要 seed；去 `/admin/login` 设密后自己发文。本机数据不会过去。 |
+| 本机改了资料，线上还是默认 | `site_settings` 也分本地/远端。线上后台再保存一次，或接受 `config.ts` 默认值。 |
+| `d1 create` 报名字已存在 | 用 `wrangler d1 list` 取已有 ID，不要再建一座同名库。 |
 
 ---
 
