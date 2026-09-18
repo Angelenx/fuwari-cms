@@ -48,7 +48,7 @@ export const navBarConfig: NavBarConfig = {
 		LinkPreset.About,
 		{
 			name: "GitHub",
-			url: "https://github.com/saicaca/fuwari", // Internal links should not include the base path, as it is automatically added
+			url: "https://github.com/Angelenx/fuwari-cms", // Internal links should not include the base path, as it is automatically added
 			external: true, // Show an external link icon and will open in a new tab
 		},
 	],
@@ -56,8 +56,8 @@ export const navBarConfig: NavBarConfig = {
 
 export const profileConfig: ProfileConfig = {
 	avatar: "assets/images/demo-avatar.png", // Relative to the /src directory. Relative to the /public directory if it starts with '/'
-	name: "Lorem Ipsum",
-	bio: "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+	name: "Angelen",
+	bio: "Graduated from University of Jinan, majoring in Artificial Intelligence. Now working as an IT Engineer developing AI-related applications.",
 	links: [
 		{
 			name: "CSDN",
@@ -72,7 +72,7 @@ export const profileConfig: ProfileConfig = {
 		{
 			name: "GitHub",
 			icon: "simple-icons:github",
-			url: "https://github.com/saicaca/fuwari",
+			url: "https://github.com/Angelenx/fuwari-cms",
 		},
 	],
 };
