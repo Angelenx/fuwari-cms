@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { api } from "../../src/api/app";
 import { hashPassword } from "../../src/lib/auth/password";
-import { getPublishedPost } from "../../src/lib/posts";
+import { getPublishedPost, listPublishedPosts } from "../../src/lib/posts";
 
 async function loginCookie(): Promise<string> {
 	const username = `user-${crypto.randomUUID()}`;
@@ -233,6 +233,84 @@ describe("admin post CRUD", () => {
 			expect(second.status).toBe(409);
 		},
 	);
+
+	it("rejects an unknown post language", { timeout: 30_000 }, async () => {
+		const cookie = await loginCookie();
+		const res = await api.request(
+			"/admin/posts",
+			jsonInit(cookie, "POST", {
+				slug: `lang-${crypto.randomUUID()}`,
+				title: "Lang",
+				bodyMd: "x",
+				status: "draft",
+				lang: "not-a-locale",
+			}),
+			env,
+		);
+		expect(res.status).toBe(400);
+	});
+
+	it(
+		"uses a custom publishedAt on the public timeline",
+		{ timeout: 30_000 },
+		async () => {
+			const cookie = await loginCookie();
+			const newerSlug = `newer-${crypto.randomUUID()}`;
+			const olderSlug = `older-${crypto.randomUUID()}`;
+			const newer = await api.request(
+				"/admin/posts",
+				jsonInit(cookie, "POST", {
+					slug: newerSlug,
+					title: "Newer",
+					bodyMd: "n",
+					status: "published",
+					publishedAt: "2020-06-01T00:00:00.000Z",
+				}),
+				env,
+			);
+			expect(newer.status).toBe(201);
+			const older = await api.request(
+				"/admin/posts",
+				jsonInit(cookie, "POST", {
+					slug: olderSlug,
+					title: "Older",
+					bodyMd: "o",
+					status: "published",
+					publishedAt: "2019-01-01T00:00:00.000Z",
+				}),
+				env,
+			);
+			expect(older.status).toBe(201);
+			expect(
+				(await older.json()) as { post: { publishedAt: string } },
+			).toMatchObject({
+				post: { publishedAt: "2019-01-01T00:00:00.000Z" },
+			});
+
+			const listed = await listPublishedPosts();
+			const slugs = listed.map((post) => post.slug);
+			expect(slugs.indexOf(newerSlug)).toBeLessThan(slugs.indexOf(olderSlug));
+			expect(
+				(await getPublishedPost(newerSlug))?.data.published.toISOString(),
+			).toBe("2020-06-01T00:00:00.000Z");
+		},
+	);
+
+	it("rejects an invalid publishedAt", { timeout: 30_000 }, async () => {
+		const cookie = await loginCookie();
+		const res = await api.request(
+			"/admin/posts",
+			jsonInit(cookie, "POST", {
+				slug: `when-${crypto.randomUUID()}`,
+				title: "When",
+				bodyMd: "x",
+				status: "published",
+				publishedAt: "not-a-date",
+			}),
+			env,
+		);
+		expect(res.status).toBe(400);
+	});
 
 	it("returns 501 for AI stubs", { timeout: 30_000 }, async () => {
 		const cookie = await loginCookie();

@@ -12,6 +12,7 @@ import { hashPassword, verifyPassword } from "../lib/auth/password";
 import { createSession, getSession } from "../lib/auth/session";
 import { MIN_PASSWORD_LENGTH } from "../lib/auth/setup";
 import { renderMarkdown } from "../lib/markdown";
+import { parsePostLang } from "../lib/post-lang";
 import {
 	getSiteSettings,
 	parseAboutInput,
@@ -61,6 +62,17 @@ function parseTags(value: unknown): string[] | { error: string } | undefined {
 	return tags;
 }
 
+function parsePublishedAt(value: unknown): string | { error: string } {
+	if (typeof value !== "string" || !value.trim()) {
+		return { error: "Invalid publishedAt" };
+	}
+	const parsed = new Date(value);
+	if (Number.isNaN(parsed.getTime())) {
+		return { error: "Invalid publishedAt" };
+	}
+	return parsed.toISOString();
+}
+
 function parseSlug(value: unknown): string | { error: string } {
 	if (
 		typeof value !== "string" ||
@@ -102,6 +114,21 @@ function parseCreate(body: unknown): PostWriteInput | { error: string } {
 	) {
 		return { error: "Invalid category" };
 	}
+	const lang =
+		body.lang === undefined || body.lang === ""
+			? "en"
+			: parsePostLang(body.lang);
+	if (!lang) {
+		return { error: "Invalid lang" };
+	}
+	let publishedAt: string | undefined;
+	if (body.publishedAt !== undefined) {
+		const custom = parsePublishedAt(body.publishedAt);
+		if (typeof custom !== "string") {
+			return custom;
+		}
+		publishedAt = custom;
+	}
 	return {
 		slug,
 		title,
@@ -112,9 +139,10 @@ function parseCreate(body: unknown): PostWriteInput | { error: string } {
 			typeof categoryRaw === "string"
 				? categoryRaw.trim() || null
 				: (categoryRaw ?? null),
-		lang: asString(body.lang)?.trim() || "en",
+		lang,
 		tags: tags ?? [],
 		status: body.status,
+		publishedAt,
 	};
 }
 
@@ -165,10 +193,11 @@ function parsePatch(
 			typeof body.category === "string" ? body.category.trim() || null : null;
 	}
 	if (body.lang !== undefined) {
-		if (typeof body.lang !== "string" || !body.lang.trim()) {
+		const lang = parsePostLang(body.lang);
+		if (!lang) {
 			return { error: "Invalid lang" };
 		}
-		patch.lang = body.lang.trim();
+		patch.lang = lang;
 	}
 	if (body.tags !== undefined) {
 		const tags = parseTags(body.tags);
@@ -182,6 +211,13 @@ function parsePatch(
 			return { error: "Invalid status" };
 		}
 		patch.status = body.status;
+	}
+	if (body.publishedAt !== undefined) {
+		const custom = parsePublishedAt(body.publishedAt);
+		if (typeof custom !== "string") {
+			return custom;
+		}
+		patch.publishedAt = custom;
 	}
 	return patch;
 }

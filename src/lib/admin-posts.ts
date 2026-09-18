@@ -36,6 +36,8 @@ export type PostWriteInput = {
 	lang: string;
 	tags: string[];
 	status: AdminPostStatus;
+	/** When set, stored as `published_at` (public list order). */
+	publishedAt?: string;
 };
 
 type ListRow = {
@@ -104,7 +106,11 @@ async function replaceTags(postId: number, tags: string[]): Promise<void> {
 function publishedAtFor(
 	status: AdminPostStatus,
 	existing: string | null,
+	custom?: string,
 ): string | null {
+	if (custom !== undefined) {
+		return custom;
+	}
 	if (status !== "published") {
 		return existing;
 	}
@@ -151,7 +157,7 @@ export async function getAdminPost(id: number): Promise<AdminPost | undefined> {
 export async function createPost(input: PostWriteInput): Promise<AdminPost> {
 	const rendered = await renderMarkdown(input.bodyMd);
 	const updatedAt = nowIso();
-	const publishedAt = publishedAtFor(input.status, null);
+	const publishedAt = publishedAtFor(input.status, null, input.publishedAt);
 
 	await env.DB.prepare(
 		`INSERT INTO posts (
@@ -212,10 +218,15 @@ export async function updatePost(
 		lang: patch.lang ?? existing.lang,
 		tags: patch.tags ?? existing.tags,
 		status: patch.status ?? existing.status,
+		publishedAt: patch.publishedAt,
 	};
 	const rendered = await renderMarkdown(next.bodyMd);
 	const updatedAt = nowIso();
-	const publishedAt = publishedAtFor(next.status, existing.publishedAt);
+	const publishedAt = publishedAtFor(
+		next.status,
+		existing.publishedAt,
+		patch.publishedAt,
+	);
 
 	await env.DB.prepare(
 		`UPDATE posts SET

@@ -1,5 +1,6 @@
 ---
 import type { AdminPost } from "@lib/admin-posts";
+import { POST_LANG_OPTIONS, parsePostLang } from "@lib/post-lang";
 
 interface Props {
 	isNew: boolean;
@@ -66,11 +67,29 @@ const { isNew, post } = Astro.props;
 	</label>
 	<label class="block text-sm">
 		Lang
-		<input
+		<select
 			class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
 			name="lang"
-			value={post?.lang ?? "en"}
-		/>
+		>
+			{
+				POST_LANG_OPTIONS.map((option) => (
+					<option
+						selected={(post?.lang ?? "en") === option.value}
+						value={option.value}
+					>
+						{option.label}
+					</option>
+				))
+			}
+			{
+				post?.lang &&
+					parsePostLang(post.lang) === undefined && (
+						<option selected value={post.lang}>
+							{post.lang}
+						</option>
+					)
+			}
+		</select>
 	</label>
 	<label class="block text-sm">
 		Status
@@ -85,6 +104,23 @@ const { isNew, post } = Astro.props;
 				published
 			</option>
 		</select>
+	</label>
+	<label class="flex items-center gap-2 text-sm">
+		<input
+			id="custom-published-at"
+			name="customPublishedAt"
+			type="checkbox"
+		/>
+		Custom published time
+	</label>
+	<label class="block text-sm" hidden id="published-at-wrap">
+		Published at
+		<input
+			class="mt-1 w-full rounded-lg border border-[var(--line-color)] bg-[var(--page-bg)] px-3 py-2"
+			name="publishedAt"
+			step="60"
+			type="datetime-local"
+		/>
 	</label>
 	<label class="block text-sm">
 		Markdown
@@ -125,7 +161,7 @@ const { isNew, post } = Astro.props;
 	>
 	</div>
 </dialog>
-<script is:inline define:vars={{ isNew, postId: post?.id ?? null }}>
+<script is:inline define:vars={{ isNew, postId: post?.id ?? null, publishedAtIso: post?.publishedAt ?? "" }}>
 	const form = document.getElementById("post-form");
 	const errorEl = document.getElementById("form-error");
 	const dialog = document.getElementById("preview-dialog");
@@ -145,13 +181,41 @@ const { isNew, post } = Astro.props;
 			.replace(/^-+|-+$/g, "");
 	});
 
+	function isoToDatetimeLocal(iso) {
+		const d = new Date(iso);
+		if (Number.isNaN(d.getTime())) {
+			return "";
+		}
+		const pad = (n) => String(n).padStart(2, "0");
+		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+	}
+
+	const customToggle = form.elements.namedItem("customPublishedAt");
+	const publishedInput = form.elements.namedItem("publishedAt");
+	const publishedWrap = document.getElementById("published-at-wrap");
+	if (publishedAtIso) {
+		customToggle.checked = true;
+		publishedInput.value = isoToDatetimeLocal(publishedAtIso);
+	}
+	function syncPublishedAtUi() {
+		const on = customToggle.checked;
+		publishedWrap.hidden = !on;
+		publishedInput.disabled = !on;
+		publishedInput.required = on;
+		if (on && !publishedInput.value) {
+			publishedInput.value = isoToDatetimeLocal(new Date().toISOString());
+		}
+	}
+	customToggle.addEventListener("change", syncPublishedAtUi);
+	syncPublishedAtUi();
+
 	function payload() {
 		const data = new FormData(form);
 		const tags = String(data.get("tags") ?? "")
 			.split(",")
 			.map((item) => item.trim())
 			.filter(Boolean);
-		return {
+		const body = {
 			title: data.get("title"),
 			slug: data.get("slug"),
 			description: data.get("description"),
@@ -162,6 +226,10 @@ const { isNew, post } = Astro.props;
 			status: data.get("status"),
 			bodyMd: data.get("bodyMd"),
 		};
+		if (customToggle.checked) {
+			body.publishedAt = new Date(publishedInput.value).toISOString();
+		}
+		return body;
 	}
 
 	dialog.addEventListener("click", (event) => {
