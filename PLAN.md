@@ -48,7 +48,7 @@
 | [Web Crypto](https://developers.cloudflare.com/workers/runtime-apis/web-crypto/) | PBKDF2-SHA256 |
 | [Vitest 集成 · 第一个测试](https://developers.cloudflare.com/workers/testing/vitest-integration/write-your-first-test/) | workerd 内测 D1 |
 | [R2 Workers API](https://developers.cloudflare.com/r2/api/workers/workers-api-usage/) | 二期上传 |
-| [Workers AI 入门](https://developers.cloudflare.com/workers-ai/get-started/workers-wrangler/) | 二期标题/摘要 |
+| [Workers AI 入门](https://developers.cloudflare.com/workers-ai/get-started/workers-wrangler/) | 三期标题/摘要 |
 
 ### Hono
 
@@ -80,7 +80,7 @@
 | 鉴权 | 单管理员密码（PBKDF2-SHA256）+ HttpOnly Session Cookie |
 | 后台 | 同站 `/admin/*`，Markdown textarea + 简易预览 |
 | 图片 | 一期外链 URL；二期 R2 |
-| AI | 一期只留 `501` stub；二期接 Workers AI |
+| AI | 一期只留 `501` stub；三期接 Workers AI |
 | 许可 | 自有代码 MIT；Fuwari 文件保留上游版权声明 |
 
 ---
@@ -212,10 +212,9 @@
 
 ## 二期
 
-**参考文档：** [R2 Workers API](https://developers.cloudflare.com/r2/api/workers/workers-api-usage/)、[Workers AI 入门](https://developers.cloudflare.com/workers-ai/get-started/workers-wrangler/)、[`wrangler d1 execute`](https://developers.cloudflare.com/workers/wrangler/commands/d1/)、Fuwari 已有 [`@astrojs/rss`](https://docs.astro.build/en/guides/rss/)
+**参考文档：** [R2 Workers API](https://developers.cloudflare.com/r2/api/workers/workers-api-usage/)、[`wrangler d1 execute`](https://developers.cloudflare.com/workers/wrangler/commands/d1/)、Fuwari 已有 [`@astrojs/rss`](https://docs.astro.build/en/guides/rss/)
 
 - [ ] R2：`POST /api/admin/media` multipart 上传，MIME 白名单，`media` 表
-- [ ] Workers AI：标题 / 摘要 / 标签建议，替换 `501` stub
 - [ ] 搜索：D1 FTS5（`GET /api/search` 已用 LIKE；先用 `wrangler d1 execute` 验证虚拟表可用再替换）
 - [ ] RSS / sitemap / OG 图（RSS 复用 Fuwari 的 `@astrojs/rss`）
 - [ ] 可选：Cloudflare Access 替代自建密码
@@ -223,6 +222,9 @@
 
 ## 三期（有余力再排）
 
+**参考文档：** [Workers AI 入门](https://developers.cloudflare.com/workers-ai/get-started/workers-wrangler/)
+
+- [ ] Workers AI：标题 / 摘要 / 标签建议，替换 `501` stub
 - 更舒服的编辑器（CodeMirror / TipTap）
 - 阅读统计
 - 友链 / 说说等扩展内容类型

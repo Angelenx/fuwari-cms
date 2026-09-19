@@ -21,7 +21,7 @@
 |------|----------|
 | 好看（偏 Fuwari） | 不少 Cloudflare CMS 功能强，默认观感不对味 |
 | 后台 + 真数据库 | Fuwari 本身是纯静态 Markdown，无 D1、无管理端 |
-| 托管在 Cloudflare | 需要 Workers + D1（二期再可选 R2 / Workers AI） |
+| 托管在 Cloudflare | 需要 Workers + D1（二期可选 R2，三期再 Workers AI） |
 
 不是给别的 CMS 换皮，也不是继续用 Git 当数据库。
 
@@ -414,10 +414,10 @@ CI 里不要写 `pnpm deploy`（同样会撞上 pnpm 内置命令）；也不要
 登录、文章 CRUD、资料/站点/About、中英 UI、公开列表/详情/标签/归档对齐 Fuwari、草稿不公开、导航搜索（`/api/search`）、围栏代码高亮（后台可批量重渲染已有贴文）。
 
 **二期**
-R2 上传、Workers AI（标题/摘要等）、D1 FTS5。
+R2 上传、D1 FTS5。
 
 **三期**
-更舒服的编辑器、统计与其它扩展（按需）。
+Workers AI（标题/摘要等）、更舒服的编辑器、统计与其它扩展（按需）。
 
 ---
 

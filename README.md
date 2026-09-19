@@ -414,10 +414,10 @@ Do not write `pnpm deploy` in CI (same pnpm built-in clash). Do not run `db:seed
 Login, post CRUD, profile/site/about, EN/zh-CN UI, public list/detail/tag/archive matching Fuwari, drafts never public, navbar search (`/api/search`), fenced-code highlighting (admin can batch re-render existing posts).
 
 **Phase 2**
-R2 uploads, Workers AI (title/excerpt/…), D1 FTS5.
+R2 uploads, D1 FTS5.
 
 **Phase 3**
-A nicer editor, stats, and other extras as needed.
+Workers AI (title/excerpt/…), a nicer editor, stats, and other extras as needed.
 
 ---
 
