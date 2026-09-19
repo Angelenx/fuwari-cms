@@ -214,6 +214,41 @@ const emptyMessage = hasFilters ? "No posts match." : "No posts yet.";
 			</div>
 		)
 	}
+	<dialog
+		class="w-[min(32rem,calc(100%-2rem))] max-h-[80vh] overflow-auto rounded-[var(--radius-large)] border-0 bg-[var(--card-bg)] p-6 text-[var(--deep-text)] shadow-lg"
+		id="rerender-dialog"
+	>
+		<h2 class="mb-3 font-medium">Re-render all posts</h2>
+		<p class="mb-2 text-sm text-[var(--btn-content)]">
+			This rewrites HTML for every post (including drafts) from stored Markdown,
+			using the current renderer.
+		</p>
+		<ul class="mb-4 list-disc space-y-1 pl-5 text-sm text-[var(--btn-content)]">
+			<li>Status, slug, tags, published_at, and updated_at stay the same.</li>
+			<li>
+				One request processes the whole table. Many posts or large code fences
+				can exceed the free Worker CPU limit; a failure writes nothing.
+			</li>
+			<li>
+				To change one or two posts, save those posts instead. Do not use this as
+				a daily button.
+			</li>
+		</ul>
+		<div class="flex flex-wrap justify-end gap-2">
+			<form method="dialog">
+				<button class="btn-regular rounded-lg px-3 py-2 text-sm" type="submit">
+					Cancel
+				</button>
+			</form>
+			<button
+				class="btn-regular rounded-lg px-3 py-2 text-sm text-red-700 dark:text-red-400"
+				id="rerender-confirm"
+				type="button"
+			>
+				Re-render
+			</button>
+		</div>
+	</dialog>
 	<script is:inline>
 		const filterForm = document.getElementById("post-filters");
 		filterForm?.addEventListener("submit", (event) => {
@@ -239,17 +274,33 @@ const emptyMessage = hasFilters ? "No posts match." : "No posts yet.";
 			void window.adminNavigate(href);
 		});
 
-		document.getElementById("rerender-posts")?.addEventListener("click", async () => {
-			if (
-				!confirm(
-					"Re-render all posts from stored Markdown? Status and dates stay the same.",
-				)
-			) {
-				return;
+		document.getElementById("rerender-posts")?.addEventListener("click", () => {
+			const confirmBtn = document.getElementById("rerender-confirm");
+			if (confirmBtn) {
+				confirmBtn.disabled = false;
+			}
+			document.getElementById("rerender-dialog")?.showModal();
+		});
+
+		document.getElementById("rerender-dialog")?.addEventListener("click", (event) => {
+			if (event.target === event.currentTarget) {
+				event.currentTarget.close();
+			}
+		});
+
+		document.getElementById("rerender-confirm")?.addEventListener("click", async () => {
+			const dialog = document.getElementById("rerender-dialog");
+			const confirmBtn = document.getElementById("rerender-confirm");
+			if (confirmBtn) {
+				confirmBtn.disabled = true;
 			}
 			const res = await fetch("/api/admin/posts/rerender", { method: "POST" });
 			const body = await res.json().catch(() => ({}));
 			if (!res.ok) {
+				if (confirmBtn) {
+					confirmBtn.disabled = false;
+				}
+				dialog?.close();
 				window.adminToast?.(
 					false,
 					typeof body.error === "string" ? body.error : "Could not re-render.",
@@ -298,4 +349,9 @@ const emptyMessage = hasFilters ? "No posts match." : "No posts yet.";
 			});
 		});
 	</script>
+	<style>
+		#rerender-dialog::backdrop {
+			background: rgb(0 0 0 / 0.4);
+		}
+	</style>
 </AdminChrome>
