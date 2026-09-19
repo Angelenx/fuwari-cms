@@ -99,6 +99,7 @@ describe("admin post CRUD", () => {
 			],
 			["/admin/posts/1", { method: "DELETE" }],
 			["/admin/posts/rerender", { method: "POST" }],
+			["/admin/posts/markdown", {}],
 			["/admin/ai/suggest-title", { method: "POST" }],
 		];
 		for (const [path, init] of paths) {
@@ -396,4 +397,108 @@ describe("admin post CRUD", () => {
 			expect(row?.body_html).not.toBe("<pre><code>echo hi</code></pre>");
 		},
 	);
+
+	it("stores client-rendered HTML and skips Worker HTML", async () => {
+		const cookie = await loginCookie();
+		const slug = `client-html-${crypto.randomUUID()}`;
+		const created = await api.request(
+			"/admin/posts",
+			jsonInit(cookie, "POST", {
+				slug,
+				title: "Client HTML",
+				bodyMd: "# Title\n\nHello world.\n",
+				status: "draft",
+				bodyHtml: '<p data-client="1">kept</p>',
+				excerpt: "kept",
+				wordCount: 1,
+				readingMinutes: 1,
+				headings: [],
+			}),
+			env,
+		);
+		expect(created.status).toBe(201);
+		const createdBody = (await created.json()) as { post: { id: number } };
+		const row = await env.DB.prepare(
+			"SELECT body_html FROM posts WHERE slug = ?",
+		)
+			.bind(slug)
+			.first<{ body_html: string }>();
+		expect(row?.body_html).toBe('<p data-client="1">kept</p>');
+
+		const published = await api.request(
+			`/admin/posts/${createdBody.post.id}`,
+			jsonInit(cookie, "PUT", { status: "published" }),
+			env,
+		);
+		expect(published.status).toBe(200);
+		expect(
+			(
+				await env.DB.prepare("SELECT body_html FROM posts WHERE slug = ?")
+					.bind(slug)
+					.first<{ body_html: string }>()
+			)?.body_html,
+		).toBe('<p data-client="1">kept</p>');
+	});
+
+	it("persists a client Re-render payload without changing status", async () => {
+		const cookie = await loginCookie();
+		const slug = `client-rerender-${crypto.randomUUID()}`;
+		const publishedAt = "2024-01-02T03:04:05.000Z";
+		await env.DB.prepare(
+			`INSERT INTO posts (
+				slug, title, description, body_md, body_html, excerpt, cover_url,
+				status, category, lang, published_at, updated_at, word_count,
+				reading_minutes, headings_json
+			) VALUES (?, 'Old html', '', 'echo hi', '<pre><code>echo hi</code></pre>', '', '',
+				'draft', NULL, 'en', ?, '2024-01-02T03:04:05.000Z', 1, 1, '[]')`,
+		)
+			.bind(slug, publishedAt)
+			.run();
+		const listed = await api.request(
+			"/admin/posts/markdown",
+			{ headers: { cookie } },
+			env,
+		);
+		expect(listed.status).toBe(200);
+		const listedBody = (await listed.json()) as {
+			posts: Array<{ id: number; bodyMd: string }>;
+		};
+		const source = listedBody.posts.find((post) => post.bodyMd === "echo hi");
+		expect(source).toBeDefined();
+
+		const persisted = await api.request(
+			"/admin/posts/rerender",
+			jsonInit(cookie, "POST", {
+				posts: [
+					{
+						id: source?.id,
+						bodyHtml: '<div class="expressive-code">echo hi</div>',
+						excerpt: "echo hi",
+						wordCount: 2,
+						readingMinutes: 1,
+						headings: [],
+					},
+				],
+			}),
+			env,
+		);
+		expect(persisted.status).toBe(200);
+		expect(await persisted.json()).toEqual({ count: 1 });
+
+		const row = await env.DB.prepare(
+			`SELECT body_html, status, published_at, updated_at
+			 FROM posts WHERE slug = ?`,
+		)
+			.bind(slug)
+			.first<{
+				body_html: string;
+				status: string;
+				published_at: string;
+				updated_at: string;
+			}>();
+		expect(row?.status).toBe("draft");
+		expect(row?.published_at).toBe(publishedAt);
+		expect(row?.updated_at).toBe("2024-01-02T03:04:05.000Z");
+		expect(row?.body_html).toContain("expressive-code");
+	});
 });

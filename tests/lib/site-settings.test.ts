@@ -30,6 +30,7 @@ describe("site settings", () => {
 		expect(settings.site.title).toBe(siteConfig.title);
 		expect(settings.site.subtitle).toBe(siteConfig.subtitle);
 		expect(settings.site.lang).toBe("en");
+		expect(settings.site.clientMarkdown).toBe(false);
 		expect(settings.site.footer).toBe(`Powered by Astro & ${siteConfig.title}`);
 		expect(settings.about.html).toBe(DEFAULT_ABOUT_HTML);
 		expect(await getSpecPageHtml("about")).toBe(DEFAULT_ABOUT_HTML);
@@ -98,10 +99,12 @@ describe("site settings", () => {
 			subtitle: "Notes",
 			footer: "",
 			lang: "zh_CN",
+			clientMarkdown: true,
 		});
 		expect(branded.site.title).toBe("Ada Blog");
 		expect(branded.site.footer).toBe("Powered by Astro & Ada Blog");
 		expect(branded.site.lang).toBe("zh_CN");
+		expect(branded.site.clientMarkdown).toBe(true);
 		expect(branded.profile.name).toBe(profileConfig.name);
 
 		const about = await upsertAbout({

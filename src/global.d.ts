@@ -7,6 +7,16 @@ declare global {
 		adminToast?: (ok: boolean, message: string) => void;
 		queueAdminToast?: (ok: boolean, message: string) => void;
 		adminNavigate?: (href: string) => Promise<void>;
+		showAdminRenderProgress?: (opts?: { total?: number }) => void;
+		setAdminRenderProgress?: (n: number) => void;
+		hideAdminRenderProgress?: () => void;
+		adminRenderMarkdown?: (markdown: string) => Promise<{
+			bodyHtml: string;
+			excerpt: string;
+			wordCount: number;
+			readingMinutes: number;
+			headings: unknown[];
+		}>;
 		__adminChromeBooted?: boolean;
 	}
 }

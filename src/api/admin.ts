@@ -4,16 +4,19 @@ import {
 	createPost,
 	deletePost,
 	getAdminPost,
+	listAdminPostMarkdown,
 	listAdminPosts,
 	type PostWriteInput,
 	parseAdminPostListFilter,
+	persistRenderedPosts,
+	type RenderedPostPersist,
 	rerenderAllPosts,
 	updatePost,
 } from "../lib/admin-posts";
 import { hashPassword, verifyPassword } from "../lib/auth/password";
 import { createSession, getSession } from "../lib/auth/session";
 import { MIN_PASSWORD_LENGTH } from "../lib/auth/setup";
-import { renderMarkdown } from "../lib/markdown";
+import { parseRenderedMarkdown, renderMarkdown } from "../lib/markdown";
 import { parsePostLang } from "../lib/post-lang";
 import {
 	getSiteSettings,
@@ -145,6 +148,7 @@ function parseCreate(body: unknown): PostWriteInput | { error: string } {
 		tags: tags ?? [],
 		status: body.status,
 		publishedAt,
+		rendered: parseRenderedMarkdown(body),
 	};
 }
 
@@ -221,11 +225,40 @@ function parsePatch(
 		}
 		patch.publishedAt = custom;
 	}
+	const rendered = parseRenderedMarkdown(body);
+	if (rendered) {
+		patch.rendered = rendered;
+	}
 	return patch;
 }
 
 function isUniqueError(err: unknown): boolean {
 	return String(err).includes("UNIQUE");
+}
+
+function parseRerenderPersist(
+	value: unknown,
+): RenderedPostPersist[] | { error: string } {
+	if (!Array.isArray(value)) {
+		return { error: "Invalid posts" };
+	}
+	const posts: RenderedPostPersist[] = [];
+	for (const item of value) {
+		if (
+			!jsonBody(item) ||
+			typeof item.id !== "number" ||
+			!Number.isInteger(item.id) ||
+			item.id < 1
+		) {
+			return { error: "Invalid posts" };
+		}
+		const rendered = parseRenderedMarkdown(item);
+		if (!rendered) {
+			return { error: "Invalid posts" };
+		}
+		posts.push({ id: item.id, ...rendered });
+	}
+	return posts;
 }
 
 const posts = new Hono<AppEnv>()
@@ -262,8 +295,25 @@ const posts = new Hono<AppEnv>()
 		}
 	})
 	.post("/rerender", async (c) => {
+		let body: unknown;
+		try {
+			body = await c.req.json();
+		} catch {
+			body = undefined;
+		}
+		if (jsonBody(body) && "posts" in body) {
+			const parsed = parseRerenderPersist(body.posts);
+			if ("error" in parsed) {
+				return c.json({ error: parsed.error }, 400);
+			}
+			const count = await persistRenderedPosts(parsed);
+			return c.json({ count });
+		}
 		const count = await rerenderAllPosts();
 		return c.json({ count });
+	})
+	.get("/markdown", async (c) => {
+		return c.json({ posts: await listAdminPostMarkdown() });
 	})
 	.get("/:id", async (c) => {
 		const id = parseId(c.req.param("id"));
@@ -394,10 +444,11 @@ export const admin = new Hono<AppEnv>()
 		if ("error" in parsed) {
 			return c.json({ error: parsed.error }, 400);
 		}
-		const rendered = await renderMarkdown(parsed.bodyMd);
+		const html =
+			parsed.bodyHtml ?? (await renderMarkdown(parsed.bodyMd)).bodyHtml;
 		const saved = await upsertAbout({
 			bodyMd: parsed.bodyMd,
-			bodyHtml: rendered.bodyHtml,
+			bodyHtml: html,
 		});
 		return c.json({ bodyMd: saved.about.md, bodyHtml: saved.about.html });
 	})

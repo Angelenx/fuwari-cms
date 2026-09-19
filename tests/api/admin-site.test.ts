@@ -75,11 +75,36 @@ describe("admin site and about API", () => {
 		);
 		expect(sitePut.status).toBe(200);
 		const siteBody = (await sitePut.json()) as {
-			site: { title: string; lang: string };
+			site: { title: string; lang: string; clientMarkdown: boolean };
 		};
 		expect(siteBody.site.title).toBe("Ada Blog");
 		expect(siteBody.site.lang).toBe("zh_CN");
+		expect(siteBody.site.clientMarkdown).toBe(false);
 		expect((await getSiteSettings()).site.lang).toBe("zh_CN");
+		expect((await getSiteSettings()).site.clientMarkdown).toBe(false);
+
+		const flagOn = await api.request(
+			"/admin/site",
+			{
+				method: "PUT",
+				headers: {
+					"content-type": "application/json",
+					cookie,
+				},
+				body: JSON.stringify({
+					title: "Ada Blog",
+					subtitle: "Notes",
+					footer: "",
+					lang: "zh_CN",
+					clientMarkdown: true,
+				}),
+			},
+			env,
+		);
+		expect(flagOn.status).toBe(200);
+		expect(
+			(await flagOn.json()) as { site: { clientMarkdown: boolean } },
+		).toMatchObject({ site: { clientMarkdown: true } });
 
 		const emptySite = await api.request(
 			"/admin/site",
@@ -105,5 +130,25 @@ describe("admin site and about API", () => {
 		expect(html).toContain("Ada");
 		expect(html).toContain("<strong>");
 		expect(siteConfig.title).not.toBe("Ada Blog");
+
+		const aboutClient = await api.request(
+			"/admin/about",
+			{
+				method: "PUT",
+				headers: {
+					"content-type": "application/json",
+					cookie,
+				},
+				body: JSON.stringify({
+					bodyMd: "ignored",
+					bodyHtml: '<p data-client="1">About kept</p>',
+				}),
+			},
+			env,
+		);
+		expect(aboutClient.status).toBe(200);
+		expect(await getSpecPageHtml("about")).toBe(
+			'<p data-client="1">About kept</p>',
+		);
 	});
 });

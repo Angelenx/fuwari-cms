@@ -16,6 +16,8 @@ export type SiteIdentity = {
 	subtitle: string;
 	footer: string;
 	lang: UiLocale;
+	/** Admin-only: render Markdown in the browser, then persist HTML. */
+	clientMarkdown: boolean;
 };
 
 export type AboutContent = {
@@ -59,6 +61,7 @@ export type SiteIdentityWrite = {
 	subtitle: string;
 	footer: string;
 	lang: UiLocale;
+	clientMarkdown: boolean;
 };
 
 export type AboutWrite = {
@@ -78,6 +81,7 @@ type SettingsRow = {
 	lang: string | null;
 	about_md: string | null;
 	about_html: string | null;
+	client_markdown: number | null;
 };
 const NAME_MAX = 80;
 const TITLE_MAX = 80;
@@ -208,6 +212,7 @@ function mergeIdentity(row: SettingsRow | null): SiteIdentity {
 		subtitle: nonempty(row?.subtitle) ?? siteConfig.subtitle,
 		footer: nonempty(row?.footer) ?? defaultFooter(title),
 		lang: parseLocale(row?.lang) ?? parseLocale(siteConfig.lang) ?? "en",
+		clientMarkdown: row?.client_markdown === 1,
 	};
 }
 
@@ -251,7 +256,7 @@ function mergeRow(row: SettingsRow | null): SiteSettings {
 export async function getSiteSettings(): Promise<SiteSettings> {
 	const row = await env.DB.prepare(
 		`SELECT avatar, name, bio, links_json, banner_json,
-			title, subtitle, footer, lang, about_md, about_html
+			title, subtitle, footer, lang, about_md, about_html, client_markdown
 		 FROM site_settings WHERE id = 1`,
 	).first<SettingsRow>();
 	return mergeRow(row);
@@ -412,11 +417,19 @@ export function parseSiteIdentityInput(
 	if (!lang) {
 		return { error: "Invalid lang" };
 	}
+	let clientMarkdown = false;
+	if (body.clientMarkdown !== undefined) {
+		if (typeof body.clientMarkdown !== "boolean") {
+			return { error: "Invalid clientMarkdown" };
+		}
+		clientMarkdown = body.clientMarkdown;
+	}
 	return {
 		title,
 		subtitle: body.subtitle.trim(),
 		footer: body.footer.trim(),
 		lang,
+		clientMarkdown,
 	};
 }
 
@@ -424,16 +437,23 @@ export async function upsertSiteIdentity(
 	input: SiteIdentityWrite,
 ): Promise<SiteSettings> {
 	await env.DB.prepare(
-		`INSERT INTO site_settings (id, title, subtitle, footer, lang, updated_at)
-		 VALUES (1, ?, ?, ?, ?, datetime('now'))
+		`INSERT INTO site_settings (id, title, subtitle, footer, lang, client_markdown, updated_at)
+		 VALUES (1, ?, ?, ?, ?, ?, datetime('now'))
 		 ON CONFLICT(id) DO UPDATE SET
 			title = excluded.title,
 			subtitle = excluded.subtitle,
 			footer = excluded.footer,
 			lang = excluded.lang,
+			client_markdown = excluded.client_markdown,
 			updated_at = excluded.updated_at`,
 	)
-		.bind(input.title, input.subtitle, input.footer, input.lang)
+		.bind(
+			input.title,
+			input.subtitle,
+			input.footer,
+			input.lang,
+			input.clientMarkdown ? 1 : 0,
+		)
 		.run();
 	return getSiteSettings();
 }
@@ -441,14 +461,17 @@ export async function upsertSiteIdentity(
 /** Trust-boundary parse for PUT /api/admin/about. */
 export function parseAboutInput(
 	body: unknown,
-): { bodyMd: string } | { error: string } {
+): { bodyMd: string; bodyHtml?: string } | { error: string } {
 	if (!asRecord(body)) {
 		return { error: "Invalid body" };
 	}
 	if (typeof body.bodyMd !== "string") {
 		return { error: "Invalid bodyMd" };
 	}
-	return { bodyMd: body.bodyMd };
+	return {
+		bodyMd: body.bodyMd,
+		bodyHtml: typeof body.bodyHtml === "string" ? body.bodyHtml : undefined,
+	};
 }
 
 export async function upsertAbout(input: AboutWrite): Promise<SiteSettings> {

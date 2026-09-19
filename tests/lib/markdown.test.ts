@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderMarkdown } from "../../src/lib/markdown";
+import { parseRenderedMarkdown, renderMarkdown } from "../../src/lib/markdown";
 
 describe("write-time markdown", () => {
 	it(
@@ -59,5 +59,17 @@ echo "<script>"
 		const result = await renderMarkdown("你好世界");
 		expect(result.wordCount).toBe(4);
 		expect(result.excerpt).toBe("你好世界");
+	});
+
+	it("accepts a complete client-rendered payload", () => {
+		const payload = {
+			bodyHtml: '<p data-client="1">x</p>',
+			excerpt: "x",
+			wordCount: 1,
+			readingMinutes: 1,
+			headings: [{ depth: 1, slug: "t", text: "T" }],
+		};
+		expect(parseRenderedMarkdown(payload)).toEqual(payload);
+		expect(parseRenderedMarkdown({ bodyHtml: "<p>x</p>" })).toBeUndefined();
 	});
 });

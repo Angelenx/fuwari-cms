@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { sqliteDateToIso } from "../utils/date-utils";
-import { renderMarkdown } from "./markdown";
+import { type RenderedMarkdown, renderMarkdown } from "./markdown";
 
 /**
  * Admin post repository. Unlike `@lib/posts`, these queries include drafts and
@@ -52,7 +52,16 @@ export type PostWriteInput = {
 	status: AdminPostStatus;
 	/** When set, stored as `published_at` (public list order). */
 	publishedAt?: string;
+	/** Skip Worker render when the admin browser already produced HTML. */
+	rendered?: RenderedMarkdown;
 };
+
+export type AdminPostMarkdown = {
+	id: number;
+	bodyMd: string;
+};
+
+export type RenderedPostPersist = RenderedMarkdown & { id: number };
 
 type ListRow = {
 	id: number;
@@ -155,6 +164,13 @@ function publishedAtFor(
 	return existing ?? nowIso();
 }
 
+async function resolveRendered(
+	bodyMd: string,
+	provided?: RenderedMarkdown,
+): Promise<RenderedMarkdown> {
+	return provided ?? renderMarkdown(bodyMd);
+}
+
 const DETAIL_SELECT = `SELECT
 	p.id,
 	p.slug,
@@ -253,7 +269,7 @@ export async function getAdminPost(id: number): Promise<AdminPost | undefined> {
 }
 
 export async function createPost(input: PostWriteInput): Promise<AdminPost> {
-	const rendered = await renderMarkdown(input.bodyMd);
+	const rendered = await resolveRendered(input.bodyMd, input.rendered);
 	const updatedAt = nowIso();
 	const publishedAt = publishedAtFor(input.status, null, input.publishedAt);
 
@@ -318,7 +334,6 @@ export async function updatePost(
 		status: patch.status ?? existing.status,
 		publishedAt: patch.publishedAt,
 	};
-	const rendered = await renderMarkdown(next.bodyMd);
 	const updatedAt = nowIso();
 	const publishedAt = publishedAtFor(
 		next.status,
@@ -326,33 +341,56 @@ export async function updatePost(
 		patch.publishedAt,
 	);
 
-	await env.DB.prepare(
-		`UPDATE posts SET
-			slug = ?, title = ?, description = ?, body_md = ?, body_html = ?,
-			excerpt = ?, cover_url = ?, status = ?, category = ?, lang = ?,
-			published_at = ?, updated_at = ?, word_count = ?, reading_minutes = ?,
-			headings_json = ?
-		 WHERE id = ?`,
-	)
-		.bind(
-			next.slug,
-			next.title,
-			next.description,
-			next.bodyMd,
-			rendered.bodyHtml,
-			rendered.excerpt,
-			next.coverUrl,
-			next.status,
-			next.category,
-			next.lang,
-			publishedAt,
-			updatedAt,
-			rendered.wordCount,
-			rendered.readingMinutes,
-			JSON.stringify(rendered.headings),
-			id,
+	if (patch.bodyMd !== undefined) {
+		const rendered = await resolveRendered(next.bodyMd, patch.rendered);
+		await env.DB.prepare(
+			`UPDATE posts SET
+				slug = ?, title = ?, description = ?, body_md = ?, body_html = ?,
+				excerpt = ?, cover_url = ?, status = ?, category = ?, lang = ?,
+				published_at = ?, updated_at = ?, word_count = ?, reading_minutes = ?,
+				headings_json = ?
+			 WHERE id = ?`,
 		)
-		.run();
+			.bind(
+				next.slug,
+				next.title,
+				next.description,
+				next.bodyMd,
+				rendered.bodyHtml,
+				rendered.excerpt,
+				next.coverUrl,
+				next.status,
+				next.category,
+				next.lang,
+				publishedAt,
+				updatedAt,
+				rendered.wordCount,
+				rendered.readingMinutes,
+				JSON.stringify(rendered.headings),
+				id,
+			)
+			.run();
+	} else {
+		await env.DB.prepare(
+			`UPDATE posts SET
+				slug = ?, title = ?, description = ?, cover_url = ?, status = ?,
+				category = ?, lang = ?, published_at = ?, updated_at = ?
+			 WHERE id = ?`,
+		)
+			.bind(
+				next.slug,
+				next.title,
+				next.description,
+				next.coverUrl,
+				next.status,
+				next.category,
+				next.lang,
+				publishedAt,
+				updatedAt,
+				id,
+			)
+			.run();
+	}
 
 	await replaceTags(id, next.tags);
 	return getAdminPost(id);
@@ -403,4 +441,44 @@ export async function rerenderAllPosts(): Promise<number> {
 		),
 	);
 	return rendered.length;
+}
+
+/** All source Markdown for client-side Re-render. ponytail: one full-table pull. */
+export async function listAdminPostMarkdown(): Promise<AdminPostMarkdown[]> {
+	const { results } = await env.DB.prepare(
+		"SELECT id, body_md FROM posts",
+	).all<{
+		id: number;
+		body_md: string;
+	}>();
+	return results.map((row) => ({ id: row.id, bodyMd: row.body_md }));
+}
+
+/**
+ * Store browser-rendered HTML without touching body_md, status, or dates.
+ */
+export async function persistRenderedPosts(
+	posts: RenderedPostPersist[],
+): Promise<number> {
+	if (posts.length === 0) {
+		return 0;
+	}
+	await env.DB.batch(
+		posts.map((post) =>
+			env.DB.prepare(
+				`UPDATE posts SET
+					body_html = ?, excerpt = ?, word_count = ?, reading_minutes = ?,
+					headings_json = ?
+				 WHERE id = ?`,
+			).bind(
+				post.bodyHtml,
+				post.excerpt,
+				post.wordCount,
+				post.readingMinutes,
+				JSON.stringify(post.headings),
+				post.id,
+			),
+		),
+	);
+	return posts.length;
 }

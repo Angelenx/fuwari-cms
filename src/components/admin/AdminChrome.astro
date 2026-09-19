@@ -175,6 +175,27 @@ const tabs = [
 			role="status"
 		>
 		</p>
+		{
+			loggedIn && (
+				<dialog
+					class="w-[min(28rem,calc(100%-2rem))] rounded-[var(--radius-large)] border-0 bg-[var(--card-bg)] p-6 text-[var(--deep-text)] shadow-lg"
+					id="admin-render-progress"
+				>
+					<p class="mb-4 text-sm">
+						Rendering Markdown. Please stay on this page — do not leave or
+						refresh.
+					</p>
+					<div class="admin-render-track" role="progressbar">
+						<div class="admin-render-bar is-indeterminate" id="admin-render-bar" />
+					</div>
+					<p
+						class="mt-3 text-center text-sm text-[var(--btn-content)]"
+						hidden
+						id="admin-render-count"
+					/>
+				</dialog>
+			)
+		}
 		<script>
 			import { bootAdminChrome } from "@lib/admin-chrome";
 			bootAdminChrome();
@@ -260,10 +281,40 @@ const tabs = [
 					transform: none;
 				}
 			}
+			#admin-render-progress::backdrop {
+				background: rgb(0 0 0 / 0.45);
+			}
+			.admin-render-track {
+				height: 0.5rem;
+				overflow: hidden;
+				border-radius: 999px;
+				background: var(--btn-regular-bg);
+			}
+			.admin-render-bar {
+				height: 100%;
+				width: 0;
+				border-radius: inherit;
+				background: var(--primary);
+				transition: width 0.2s ease;
+			}
+			.admin-render-bar.is-indeterminate {
+				width: 40%;
+				transition: none;
+				animation: admin-render-slide 1.2s ease-in-out infinite;
+			}
+			@keyframes admin-render-slide {
+				0% {
+					transform: translateX(-120%);
+				}
+				100% {
+					transform: translateX(280%);
+				}
+			}
 			@media (prefers-reduced-motion: reduce) {
 				nav[aria-label="Admin"] a::after,
 				.admin-loader span,
-				.admin-panel-in {
+				.admin-panel-in,
+				.admin-render-bar.is-indeterminate {
 					animation: none;
 					transition: none;
 				}

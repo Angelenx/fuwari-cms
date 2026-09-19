@@ -1,6 +1,7 @@
 ---
 import type { AdminPost } from "@lib/admin-posts";
 import { POST_LANG_OPTIONS, parsePostLang } from "@lib/post-lang";
+import { getSiteSettings } from "@lib/site-settings";
 
 interface Props {
 	isNew: boolean;
@@ -8,6 +9,8 @@ interface Props {
 }
 
 const { isNew, post } = Astro.props;
+const { site } = await getSiteSettings();
+const clientMarkdown = site.clientMarkdown;
 ---
 
 <p class="text-sm text-[var(--btn-content)]">
@@ -164,7 +167,7 @@ const { isNew, post } = Astro.props;
 	>
 	</div>
 </dialog>
-<script is:inline define:vars={{ isNew, postId: post?.id ?? null }}>
+<script is:inline define:vars={{ isNew, postId: post?.id ?? null, clientMarkdown }}>
 	const form = document.getElementById("post-form");
 	const errorEl = document.getElementById("form-error");
 	const dialog = document.getElementById("preview-dialog");
@@ -250,10 +253,30 @@ const { isNew, post } = Astro.props;
 
 	document.getElementById("preview-btn").addEventListener("click", async () => {
 		errorEl.classList.add("hidden");
+		const bodyMd = payload().bodyMd;
+		if (clientMarkdown) {
+			window.showAdminRenderProgress?.();
+			try {
+				const rendered = await window.adminRenderMarkdown?.(bodyMd);
+				window.hideAdminRenderProgress?.();
+				if (!rendered) {
+					errorEl.textContent = "Could not render preview.";
+					errorEl.classList.remove("hidden");
+					return;
+				}
+				document.getElementById("preview").innerHTML = rendered.bodyHtml ?? "";
+				dialog.showModal();
+			} catch {
+				window.hideAdminRenderProgress?.();
+				errorEl.textContent = "Could not render preview.";
+				errorEl.classList.remove("hidden");
+			}
+			return;
+		}
 		const res = await fetch("/api/admin/preview", {
 			method: "POST",
 			headers: { "content-type": "application/json" },
-			body: JSON.stringify({ body_md: payload().bodyMd }),
+			body: JSON.stringify({ body_md: bodyMd }),
 		});
 		if (!res.ok) {
 			errorEl.textContent = "Could not render preview.";
@@ -268,12 +291,35 @@ const { isNew, post } = Astro.props;
 	form.addEventListener("submit", async (event) => {
 		event.preventDefault();
 		errorEl.classList.add("hidden");
+		let data = payload();
+		if (clientMarkdown) {
+			window.showAdminRenderProgress?.();
+			try {
+				const rendered = await window.adminRenderMarkdown?.(data.bodyMd);
+				if (!rendered) {
+					throw new Error("render failed");
+				}
+				data = { ...data, ...rendered };
+			} catch {
+				window.hideAdminRenderProgress?.();
+				window.adminToast(false, "Could not render Markdown.");
+				return;
+			}
+		}
 		const url = isNew ? "/api/admin/posts" : `/api/admin/posts/${postId}`;
-		const res = await fetch(url, {
-			method: isNew ? "POST" : "PUT",
-			headers: { "content-type": "application/json" },
-			body: JSON.stringify(payload()),
-		});
+		let res;
+		try {
+			res = await fetch(url, {
+				method: isNew ? "POST" : "PUT",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify(data),
+			});
+		} catch {
+			window.hideAdminRenderProgress?.();
+			window.adminToast(false, "Could not save.");
+			return;
+		}
+		window.hideAdminRenderProgress?.();
 		const body = await res.json().catch(() => ({}));
 		if (!res.ok) {
 			window.adminToast(

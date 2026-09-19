@@ -69,6 +69,68 @@ export function bootAdminChrome(): void {
 	window.queueAdminToast = queueAdminToast;
 	flushQueuedToast();
 
+	const renderDialog = document.getElementById("admin-render-progress");
+	const renderBar = document.getElementById("admin-render-bar");
+	const renderCount = document.getElementById("admin-render-count");
+	let renderTotal = 0;
+
+	function warnUnload(event: BeforeUnloadEvent): void {
+		event.preventDefault();
+		event.returnValue = "";
+	}
+
+	if (renderDialog instanceof HTMLDialogElement) {
+		renderDialog.addEventListener("cancel", (event) => {
+			event.preventDefault();
+		});
+		window.showAdminRenderProgress = (opts) => {
+			renderTotal = opts?.total && opts.total > 0 ? opts.total : 0;
+			if (renderBar) {
+				renderBar.classList.toggle("is-indeterminate", renderTotal === 0);
+				renderBar.style.width = renderTotal === 0 ? "" : "0%";
+			}
+			if (renderCount) {
+				renderCount.hidden = renderTotal === 0;
+				renderCount.textContent = renderTotal === 0 ? "" : `0 / ${renderTotal}`;
+			}
+			window.addEventListener("beforeunload", warnUnload);
+			if (!renderDialog.open) {
+				renderDialog.showModal();
+			}
+		};
+		window.setAdminRenderProgress = (n) => {
+			if (renderTotal <= 0) {
+				return;
+			}
+			const current = Math.min(Math.max(n, 0), renderTotal);
+			if (renderBar) {
+				renderBar.classList.remove("is-indeterminate");
+				renderBar.style.width = `${(current / renderTotal) * 100}%`;
+			}
+			if (renderCount) {
+				renderCount.hidden = false;
+				renderCount.textContent = `${current} / ${renderTotal}`;
+			}
+		};
+		window.hideAdminRenderProgress = () => {
+			window.removeEventListener("beforeunload", warnUnload);
+			renderDialog.close();
+			if (renderBar) {
+				renderBar.classList.add("is-indeterminate");
+				renderBar.style.width = "";
+			}
+			if (renderCount) {
+				renderCount.hidden = true;
+				renderCount.textContent = "";
+			}
+		};
+	}
+
+	window.adminRenderMarkdown = async (markdown) => {
+		const { renderMarkdown } = await import("./markdown");
+		return renderMarkdown(markdown);
+	};
+
 	document
 		.getElementById("admin-logout")
 		?.addEventListener("click", async () => {
@@ -130,15 +192,15 @@ export function bootAdminChrome(): void {
 		if (!nextPanel) {
 			return false;
 		}
+		const nextActions = doc.getElementById("admin-actions");
+		if (actions) {
+			actions.innerHTML = nextActions?.innerHTML ?? "";
+		}
 		panel.innerHTML = nextPanel.innerHTML;
 		try {
 			runInlineScripts(panel);
 		} catch {
 			return false;
-		}
-		const nextActions = doc.getElementById("admin-actions");
-		if (actions) {
-			actions.innerHTML = nextActions?.innerHTML ?? "";
 		}
 		const nextTitle = doc.getElementById("admin-header-title");
 		if (titleEl && nextTitle) {

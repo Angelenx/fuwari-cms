@@ -53,6 +53,22 @@ const { site } = await getSiteSettings();
 				</option>
 			</select>
 		</label>
+		<label class="flex items-start gap-2 text-sm">
+			<input
+				checked={site.clientMarkdown}
+				class="mt-1"
+				id="client-markdown"
+				name="clientMarkdown"
+				type="checkbox"
+			/>
+			<span>
+				Render Markdown in the browser
+				<span class="mt-1 block text-[var(--btn-content)]">
+					Skips Worker CPU on preview, save, and Re-render (free plan). Stay on
+					this page while it runs; do not leave or refresh.
+				</span>
+			</span>
+		</label>
 		<button class="btn-regular rounded-lg px-3 py-2 text-sm" type="submit">
 			Save
 		</button>
@@ -70,6 +86,9 @@ const { site } = await getSiteSettings();
 					subtitle: data.get("subtitle") ?? "",
 					footer: data.get("footer") ?? "",
 					lang: data.get("lang") ?? "",
+					clientMarkdown: Boolean(
+						form.querySelector("#client-markdown")?.checked,
+					),
 				}),
 			});
 			const body = await res.json().catch(() => ({}));

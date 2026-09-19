@@ -1,5 +1,7 @@
 /**
- * Write-time Markdown renderer. Pages never call this; they read `body_html`.
+ * Write-time Markdown renderer. Public pages never call this; they read
+ * `body_html`. Default path is the Worker; `/admin/site` can opt into the same
+ * function in the browser so free-plan CPU does not 503 on save.
  *
  * ponytail: Fuwari admonition / GitHub-card plugins still need rehype-components.
  * Fence blocks go through rehype-expressive-code (Shiki JS engine for workerd).
@@ -27,6 +29,60 @@ export type RenderedMarkdown = {
 	readingMinutes: number;
 	headings: MarkdownHeading[];
 };
+
+/**
+ * Client-rendered payload from an admin session. Incomplete objects return
+ * undefined so the Worker still runs `renderMarkdown`.
+ */
+export function parseRenderedMarkdown(
+	body: unknown,
+): RenderedMarkdown | undefined {
+	if (!body || typeof body !== "object") {
+		return undefined;
+	}
+	const rec = body as Record<string, unknown>;
+	if (typeof rec.bodyHtml !== "string" || typeof rec.excerpt !== "string") {
+		return undefined;
+	}
+	if (
+		typeof rec.wordCount !== "number" ||
+		!Number.isFinite(rec.wordCount) ||
+		typeof rec.readingMinutes !== "number" ||
+		!Number.isFinite(rec.readingMinutes)
+	) {
+		return undefined;
+	}
+	if (!Array.isArray(rec.headings)) {
+		return undefined;
+	}
+	const headings: MarkdownHeading[] = [];
+	for (const item of rec.headings) {
+		if (!item || typeof item !== "object") {
+			return undefined;
+		}
+		const heading = item as Record<string, unknown>;
+		if (
+			typeof heading.depth !== "number" ||
+			!Number.isFinite(heading.depth) ||
+			typeof heading.slug !== "string" ||
+			typeof heading.text !== "string"
+		) {
+			return undefined;
+		}
+		headings.push({
+			depth: heading.depth,
+			slug: heading.slug,
+			text: heading.text,
+		});
+	}
+	return {
+		bodyHtml: rec.bodyHtml,
+		excerpt: rec.excerpt,
+		wordCount: rec.wordCount,
+		readingMinutes: rec.readingMinutes,
+		headings,
+	};
+}
 
 function rehypeCollectHeadings() {
 	return (

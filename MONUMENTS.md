@@ -2,6 +2,10 @@
 
 Dated log of major repository changes. Newest first.
 
+## 2026-09-19 — Optional browser Markdown render
+
+`/admin/site` can turn on client-side Markdown rendering so preview, save, and Re-render skip Worker CPU. The Worker path stays the default. Public pages still SSR stored `body_html`.
+
 ## 2026-09-19 — Bilingual GitHub README
 
 The GitHub default `README.md` is English. Simplified Chinese is [`README.zh-CN.md`](./README.zh-CN.md); each file links to the other at the top.

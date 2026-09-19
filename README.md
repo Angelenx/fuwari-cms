@@ -25,7 +25,7 @@ Phased plan and acceptance checks: [PLAN.md](./PLAN.md). Major changes: [MONUMEN
 
 This is not a reskin of another CMS, and Git is not the database.
 
-**Strategy: copy the theme shell, replace the content source.** Take Layout / Navbar / cards / Markdown styles from Fuwari commit `6d39b0d`; drop Content Collections and `getCollection`. Post Markdown is stored as D1 `body_md` and **rendered at write time** in the Worker to `body_html`. Public pages only read cached HTML. Drafts never enter public queries.
+**Strategy: copy the theme shell, replace the content source.** Take Layout / Navbar / cards / Markdown styles from Fuwari commit `6d39b0d`; drop Content Collections and `getCollection`. Post Markdown is stored as D1 `body_md` and **rendered at write time** to `body_html` (Worker by default; `/admin/site` can switch to the browser). Public pages only read cached HTML. Drafts never enter public queries.
 
 Phase-1 limits: cover / avatar / banner are URL strings (remote or in-site paths), no R2; no comments; no FTS full-text index; no real AI (`/api/admin/ai/*` returns 501). Navbar search is `GET /api/search` (`LIKE` on published posts only). Empty `site_settings` fields overlay the current frontend defaults in [`src/config.ts`](./src/config.ts).
 
@@ -69,7 +69,7 @@ flowchart LR
 | API | Hono ([`src/api/app.ts`](./src/api/app.ts), unit-testable without Astro) |
 | Database | D1, binding name `DB` (not an env var) |
 | Auth | Single admin; PBKDF2-SHA256; D1 `sessions` + HMAC-signed `sid` cookie |
-| Markdown | [`src/lib/markdown.ts`](./src/lib/markdown.ts) at write time; fences via `rehype-expressive-code` (Shiki JavaScript engine) |
+| Markdown | [`src/lib/markdown.ts`](./src/lib/markdown.ts) at write time (Worker by default; `/admin/site` can use the browser); fences via `rehype-expressive-code` (Shiki JavaScript engine) |
 | Public reads | [`src/lib/posts.ts`](./src/lib/posts.ts), always `status = 'published'` |
 | Admin writes | [`src/lib/admin-posts.ts`](./src/lib/admin-posts.ts) (includes drafts) |
 
@@ -112,7 +112,7 @@ Index: `idx_sessions_expires_at`.
 | `id` | INTEGER PK |
 | `slug` | UNIQUE, kebab-case |
 | `title` / `description` | |
-| `body_md` / `body_html` | Source Markdown and write-time HTML |
+| `body_md` / `body_html` | Source Markdown and write-time HTML (Worker or browser) |
 | `excerpt` / `headings_json` | List excerpt and TOC |
 | `cover_url` | Remote URL or in-site path |
 | `status` | `draft` \| `published` |
@@ -139,6 +139,7 @@ Single row; `id` must be `1`.
 | `title` / `subtitle` / `footer` | 0003 | Nav brand, subtitle, footer second line |
 | `about_md` / `about_html` | 0003 | About page |
 | `lang` | 0004 | Default UI language when there is no cookie |
+| `client_markdown` | 0005 | Admin: render Markdown in the browser (NULL = off) |
 | `updated_at` | | |
 
 **Do not** apply [`scripts/seed.sql`](./scripts/seed.sql) with `--remote` (local demo posts only).
@@ -165,7 +166,7 @@ Replace `SESSION_SECRET` in `.dev.vars` with a long random string. First visit t
 
 - `/admin` posts (timeline by publish date; search; filter by tag / status; **Re-render posts** refreshes stored HTML with the current renderer, without changing status or dates)
 - `/admin/profile` avatar, bio, three links, banner
-- `/admin/site` title, footer, default language
+- `/admin/site` title, footer, default language, **Render Markdown in the browser**
 - `/admin/about` About Markdown
 
 Fields not stored in D1 keep `src/config.ts`. To redo local setup:
@@ -387,7 +388,7 @@ Do not write `pnpm deploy` in CI (same pnpm built-in clash). Do not run `db:seed
 │   ├── lib/posts.ts          # Public posts (published only)
 │   ├── lib/admin-posts.ts    # Admin posts (includes drafts)
 │   ├── lib/site-settings.ts  # Profile / banner / site identity / about
-│   ├── lib/markdown.ts       # Write-time Markdown → body_html (syntax highlighting)
+│   ├── lib/markdown.ts       # Write-time Markdown → body_html (Worker or browser)
 │   ├── lib/auth/             # PBKDF2 + D1 session + first-run password
 │   ├── plugins/              # Remark plugins adapted from Fuwari
 │   ├── types/post.ts         # PostEntry: pre-rendered bodyHtml + excerpt/words/TOC

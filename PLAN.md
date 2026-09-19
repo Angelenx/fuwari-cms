@@ -75,7 +75,7 @@
 | 架构 | 单仓库、单 Cloudflare Worker：Astro 7 SSR + `@astrojs/cloudflare` 14。Hono 挂在 `src/fetch.ts`，用 `astro/hono` 的 `actions()` / `middleware()` / `pages()` / `i18n()` 串起 Astro 管线；自有 API 走 `/api/*` |
 | 基线版本 | Astro ^7.2、`@astrojs/cloudflare` ^14、Node ≥ 22.12、pnpm 9（沿用 Fuwari `packageManager`） |
 | 主题来源 | 从 Fuwari 固定提交 `6d39b0d` **拷贝**进本仓库（非 submodule，因为要深改）。实际拷贝后把 SHA 写入 `third_party/fuwari/README.md` |
-| 运行时 Markdown | 写入时在 Worker 内用 `unified` + Fuwari 的 remark/rehype 插件链 + `rehype-expressive-code` 渲染并缓存 `body_html`；**不走** Astro 的 `.md` 管线（v7 默认 Sätteri） |
+| 运行时 Markdown | 写入时用 `unified` + Fuwari 的 remark/rehype 插件链 + `rehype-expressive-code` 渲染并缓存 `body_html`（默认在 Worker 内；`/admin/site` 可改为浏览器渲染后存库）；**不走** Astro 的 `.md` 管线（v7 默认 Sätteri） |
 | 数据 | D1；Markdown 存 `body_md` |
 | 鉴权 | 单管理员密码（PBKDF2-SHA256）+ HttpOnly Session Cookie |
 | 后台 | 同站 `/admin/*`，Markdown textarea + 简易预览 |
@@ -189,7 +189,7 @@
 - [x] `POST /api/admin/ai/:name` 一律返回 `501`
 - [x] Vitest：CRUD 全流程 + 未登录调用全部 401；markdown 渲染单测
 - [x] `/admin/profile`：D1 `site_settings` 单行；头像 / 姓名 / 简介 / 三链 / banner 空字段回退 `src/config.ts` 当前前端值；社交图标 CSDN / Bilibili / GitHub（Simple Icons）
-- [x] `/admin/site`、`/admin/about`：站点标题 / 副标题 / 页脚与 About Markdown；空字段回退 `src/config.ts`
+- [x] `/admin/site`、`/admin/about`：站点标题 / 副标题 / 页脚与 About Markdown；空字段回退 `src/config.ts`。`clientMarkdown` 开关：打开后后台预览/保存/Re-render 在浏览器渲染再存 HTML
 
 **验收**：后台发布一篇文章，公开站刷新即见；撤回为草稿后公开站消失。 ✅ 2026-09-18
 

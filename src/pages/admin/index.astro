@@ -8,6 +8,7 @@ import {
 	parseAdminPostListFilter,
 } from "@lib/admin-posts";
 import { getSessionFromRequest } from "@lib/auth/session";
+import { getSiteSettings } from "@lib/site-settings";
 
 const user = await getSessionFromRequest(Astro.request, env);
 if (!user) {
@@ -22,9 +23,10 @@ const filter = parseAdminPostListFilter({
 const hasFilters = Boolean(
 	filter.q || filter.tag || (filter.status && filter.status !== "all"),
 );
-const [posts, tags] = await Promise.all([
+const [posts, tags, { site }] = await Promise.all([
 	listAdminPosts(filter),
 	listAdminTags(),
+	getSiteSettings(),
 ]);
 
 type YearGroup = { label: string; posts: AdminPostListItem[] };
@@ -58,6 +60,7 @@ function groupByPublishedYear(items: AdminPostListItem[]): YearGroup[] {
 
 const groups = groupByPublishedYear(posts);
 const emptyMessage = hasFilters ? "No posts match." : "No posts yet.";
+const clientMarkdown = site.clientMarkdown;
 ---
 
 <AdminChrome loggedIn title="Posts">
@@ -225,10 +228,20 @@ const emptyMessage = hasFilters ? "No posts match." : "No posts yet.";
 		</p>
 		<ul class="mb-4 list-disc space-y-1 pl-5 text-sm text-[var(--btn-content)]">
 			<li>Status, slug, tags, published_at, and updated_at stay the same.</li>
-			<li>
-				One request processes the whole table. Many posts or large code fences
-				can exceed the free Worker CPU limit; a failure writes nothing.
-			</li>
+			{
+				clientMarkdown ? (
+					<li>
+						Rendering runs in this browser. Stay on the page; do not leave or
+						refresh until it finishes.
+					</li>
+				) : (
+					<li>
+						One request processes the whole table. Many posts or large code
+						fences can exceed the free Worker CPU limit; a failure writes
+						nothing.
+					</li>
+				)
+			}
 			<li>
 				To change one or two posts, save those posts instead. Do not use this as
 				a daily button.
@@ -249,7 +262,7 @@ const emptyMessage = hasFilters ? "No posts match." : "No posts yet.";
 			</button>
 		</div>
 	</dialog>
-	<script is:inline>
+	<script is:inline define:vars={{ clientMarkdown }}>
 		const filterForm = document.getElementById("post-filters");
 		filterForm?.addEventListener("submit", (event) => {
 			if (!window.adminNavigate) {
@@ -294,13 +307,65 @@ const emptyMessage = hasFilters ? "No posts match." : "No posts yet.";
 			if (confirmBtn) {
 				confirmBtn.disabled = true;
 			}
+			dialog?.close();
+			if (clientMarkdown) {
+				window.showAdminRenderProgress?.();
+				try {
+					const listed = await fetch("/api/admin/posts/markdown");
+					if (!listed.ok) {
+						throw new Error("list failed");
+					}
+					const listedBody = await listed.json();
+					const source = Array.isArray(listedBody.posts) ? listedBody.posts : [];
+					window.showAdminRenderProgress?.({ total: source.length });
+					const posts = [];
+					let n = 0;
+					for (const post of source) {
+						const rendered = await window.adminRenderMarkdown?.(post.bodyMd ?? "");
+						if (!rendered) {
+							throw new Error("render failed");
+						}
+						posts.push({ id: post.id, ...rendered });
+						n += 1;
+						window.setAdminRenderProgress?.(n);
+					}
+					const res = await fetch("/api/admin/posts/rerender", {
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: JSON.stringify({ posts }),
+					});
+					const body = await res.json().catch(() => ({}));
+					window.hideAdminRenderProgress?.();
+					if (!res.ok) {
+						if (confirmBtn) {
+							confirmBtn.disabled = false;
+						}
+						window.adminToast?.(
+							false,
+							typeof body.error === "string" ? body.error : "Could not re-render.",
+						);
+						return;
+					}
+					window.queueAdminToast?.(
+						true,
+						`Re-rendered ${typeof body.count === "number" ? body.count : 0} posts.`,
+					);
+					location.reload();
+				} catch {
+					window.hideAdminRenderProgress?.();
+					if (confirmBtn) {
+						confirmBtn.disabled = false;
+					}
+					window.adminToast?.(false, "Could not re-render.");
+				}
+				return;
+			}
 			const res = await fetch("/api/admin/posts/rerender", { method: "POST" });
 			const body = await res.json().catch(() => ({}));
 			if (!res.ok) {
 				if (confirmBtn) {
 					confirmBtn.disabled = false;
 				}
-				dialog?.close();
 				window.adminToast?.(
 					false,
 					typeof body.error === "string" ? body.error : "Could not re-render.",

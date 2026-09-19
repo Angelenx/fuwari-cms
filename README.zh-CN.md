@@ -25,7 +25,7 @@
 
 不是给别的 CMS 换皮，也不是继续用 Git 当数据库。
 
-**策略：拷贝主题壳，替换内容源。** 从 Fuwari 固定提交 `6d39b0d` 带走 Layout / Navbar / 卡片 / Markdown 样式；去掉 Content Collections 与 `getCollection`。文章 Markdown 存在 D1 的 `body_md`，**写入时**在 Worker 里渲染成 `body_html`，前台只读缓存 HTML。草稿永远不进公开查询。
+**策略：拷贝主题壳，替换内容源。** 从 Fuwari 固定提交 `6d39b0d` 带走 Layout / Navbar / 卡片 / Markdown 样式；去掉 Content Collections 与 `getCollection`。文章 Markdown 存在 D1 的 `body_md`，**写入时**渲染成 `body_html`（默认在 Worker 内；`/admin/site` 可改为浏览器渲染）。前台只读缓存 HTML。草稿永远不进公开查询。
 
 一期边界：封面/头像/banner 用 URL 字符串（外链或站点内路径），不上 R2；无评论、无 FTS 全文索引、无真 AI（`/api/admin/ai/*` 返回 501）。导航搜索走 `GET /api/search`（对已发布帖 `LIKE`，草稿不进结果）。`site_settings` 里空着的字段按字段 overlay [`src/config.ts`](./src/config.ts) 的当前前端默认值。
 
@@ -69,7 +69,7 @@ flowchart LR
 | API | Hono（[`src/api/app.ts`](./src/api/app.ts)，可脱离 Astro 单测） |
 | 数据库 | D1，binding 名 `DB`（不是环境变量） |
 | 鉴权 | 单管理员；PBKDF2-SHA256；D1 `sessions` + HMAC 签名 Cookie `sid` |
-| Markdown | [`src/lib/markdown.ts`](./src/lib/markdown.ts) 写入时渲染；围栏走 `rehype-expressive-code`（Shiki JavaScript 引擎） |
+| Markdown | [`src/lib/markdown.ts`](./src/lib/markdown.ts) 写入时渲染（默认 Worker；`/admin/site` 可改浏览器）；围栏走 `rehype-expressive-code`（Shiki JavaScript 引擎） |
 | 公开读 | [`src/lib/posts.ts`](./src/lib/posts.ts)，永远 `status = 'published'` |
 | 后台写 | [`src/lib/admin-posts.ts`](./src/lib/admin-posts.ts)（含草稿） |
 
@@ -112,7 +112,7 @@ Schema 以 [`migrations/`](./migrations/) 为准。读路径上，空字符串 /
 | `id` | INTEGER PK |
 | `slug` | UNIQUE，kebab-case |
 | `title` / `description` | |
-| `body_md` / `body_html` | 原文与写入时渲染结果 |
+| `body_md` / `body_html` | 原文与写入时渲染结果（Worker 或浏览器） |
 | `excerpt` / `headings_json` | 列表摘要与目录 |
 | `cover_url` | 外链或站点路径 |
 | `status` | `draft` \| `published` |
@@ -139,6 +139,7 @@ Schema 以 [`migrations/`](./migrations/) 为准。读路径上，空字符串 /
 | `title` / `subtitle` / `footer` | 0003 | 导航品牌、副标题、页脚第二行 |
 | `about_md` / `about_html` | 0003 | About 页 |
 | `lang` | 0004 | 无 cookie 时的默认 UI 语言 |
+| `client_markdown` | 0005 | 后台：在浏览器渲染 Markdown（NULL = 关） |
 | `updated_at` | | |
 
 **禁止**把 [`scripts/seed.sql`](./scripts/seed.sql) 用 `--remote` 打进生产库（本地演示稿而已）。
@@ -165,7 +166,7 @@ pnpm test                        # Vitest，跑在 workerd
 
 - `/admin` 文章（按发布时间轴，可搜，可按 Tag / 状态筛；**Re-render posts** 用当前渲染器刷新已有贴文 HTML，不改状态和时间）
 - `/admin/profile` 头像、简介、三链、banner
-- `/admin/site` 标题、页脚、默认语言
+- `/admin/site` 标题、页脚、默认语言、**在浏览器渲染 Markdown**
 - `/admin/about` About Markdown
 
 未写入 D1 的字段沿用 `src/config.ts`。若要重新设密：
@@ -387,7 +388,7 @@ CI 里不要写 `pnpm deploy`（同样会撞上 pnpm 内置命令）；也不要
 │   ├── lib/posts.ts          # 公开文章（仅 published）
 │   ├── lib/admin-posts.ts    # 后台文章（含草稿）
 │   ├── lib/site-settings.ts  # 资料 / banner / 站点身份 / about
-│   ├── lib/markdown.ts       # 写入时 Markdown → body_html（含代码高亮）
+│   ├── lib/markdown.ts       # 写入时 Markdown → body_html（Worker 或浏览器）
 │   ├── lib/auth/             # PBKDF2 + D1 session + 首次设密
 │   ├── plugins/              # 改编自 Fuwari 的 remark 插件
 │   ├── types/post.ts         # PostEntry：预渲染 bodyHtml + 摘要/字数/目录

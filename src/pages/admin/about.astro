@@ -9,7 +9,8 @@ if (!user) {
 	return Astro.redirect("/admin/login");
 }
 
-const { about } = await getSiteSettings();
+const { about, site } = await getSiteSettings();
+const clientMarkdown = site.clientMarkdown;
 ---
 
 <AdminChrome loggedIn title="About">
@@ -53,7 +54,7 @@ const { about } = await getSiteSettings();
 		>
 		</div>
 	</dialog>
-	<script is:inline>
+	<script is:inline define:vars={{ clientMarkdown }}>
 		const form = document.getElementById("about-form");
 		const errorEl = document.getElementById("form-error");
 		const dialog = document.getElementById("preview-dialog");
@@ -65,6 +66,25 @@ const { about } = await getSiteSettings();
 		document.getElementById("preview-btn").addEventListener("click", async () => {
 			errorEl.classList.add("hidden");
 			const bodyMd = new FormData(form).get("bodyMd") ?? "";
+			if (clientMarkdown) {
+				window.showAdminRenderProgress?.();
+				try {
+					const rendered = await window.adminRenderMarkdown?.(bodyMd);
+					window.hideAdminRenderProgress?.();
+					if (!rendered) {
+						errorEl.textContent = "Could not render preview.";
+						errorEl.classList.remove("hidden");
+						return;
+					}
+					document.getElementById("preview").innerHTML = rendered.bodyHtml ?? "";
+					dialog.showModal();
+				} catch {
+					window.hideAdminRenderProgress?.();
+					errorEl.textContent = "Could not render preview.";
+					errorEl.classList.remove("hidden");
+				}
+				return;
+			}
 			const res = await fetch("/api/admin/preview", {
 				method: "POST",
 				headers: { "content-type": "application/json" },
@@ -82,13 +102,38 @@ const { about } = await getSiteSettings();
 		form.addEventListener("submit", async (event) => {
 			event.preventDefault();
 			errorEl.classList.add("hidden");
-			const res = await fetch("/api/admin/about", {
-				method: "PUT",
-				headers: { "content-type": "application/json" },
-				body: JSON.stringify({
-					bodyMd: new FormData(form).get("bodyMd") ?? "",
-				}),
-			});
+			const bodyMd = new FormData(form).get("bodyMd") ?? "";
+			const payload = { bodyMd };
+			if (clientMarkdown) {
+				window.showAdminRenderProgress?.();
+				try {
+					const rendered = await window.adminRenderMarkdown?.(bodyMd);
+					if (!rendered) {
+						throw new Error("render failed");
+					}
+					payload.bodyHtml = rendered.bodyHtml;
+				} catch {
+					window.hideAdminRenderProgress?.();
+					window.adminToast(
+						false,
+						"Could not render Markdown.",
+					);
+					return;
+				}
+			}
+			let res;
+			try {
+				res = await fetch("/api/admin/about", {
+					method: "PUT",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify(payload),
+				});
+			} catch {
+				window.hideAdminRenderProgress?.();
+				window.adminToast(false, "Could not save.");
+				return;
+			}
+			window.hideAdminRenderProgress?.();
 			const body = await res.json().catch(() => ({}));
 			if (!res.ok) {
 				window.adminToast(
