@@ -15,7 +15,7 @@ export interface PostData {
 	tags: string[];
 	category: string | null;
 	lang: string;
-	// Neighbour links are filled in by `getPublishedPost` / `getSortedPosts`; never stored.
+	// Neighbour links are filled in by `getPublishedPost`; never stored.
 	prevSlug?: string;
 	prevTitle?: string;
 	nextSlug?: string;

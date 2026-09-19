@@ -1,6 +1,6 @@
 import rss from "@astrojs/rss";
+import { listPublishedPostsForRss } from "@lib/posts";
 import { getSiteSettings } from "@lib/site-settings";
-import { getSortedPosts } from "@utils/content-utils";
 import { url } from "@utils/url-utils";
 import type { APIContext } from "astro";
 import { siteConfig } from "@/config";
@@ -14,7 +14,7 @@ function stripInvalidXmlChars(str: string): string {
 }
 
 export async function GET(context: APIContext) {
-	const blog = await getSortedPosts();
+	const blog = await listPublishedPostsForRss();
 	const { site } = await getSiteSettings();
 
 	return rss({

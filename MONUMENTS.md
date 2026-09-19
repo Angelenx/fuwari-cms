@@ -2,6 +2,10 @@
 
 Dated log of major repository changes. Newest first.
 
+## 2026-09-19 — Paged public lists and archive scroll
+
+Homepage cards come from SQL `COUNT` + `LIMIT 8` without `body_html`. The archive timeline loads `GET /api/posts` by keyset and merges years in the browser. Sidebar tags/categories use `GROUP BY`. RSS still fetches full HTML.
+
 ## 2026-09-19 — Optional browser Markdown render
 
 `/admin/site` can turn on client-side Markdown rendering so preview, save, and Re-render skip Worker CPU. The Worker path stays the default. Public pages still SSR stored `body_html`.

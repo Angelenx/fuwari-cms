@@ -144,7 +144,7 @@
 - [x] 索引：`posts(status, published_at DESC)`、`sessions(expires_at)`
 - [x] `users` / `sessions` 建表但保持空。**管理员种子推迟到阶段 3**（需要 PBKDF2）；本阶段不写 `password.ts`
 - [x] 演示文章在 `scripts/seed.sql`（阶段 1 的 3 篇 published + 1 篇 draft），**不进**会应用到远端的 migration。`pnpm db:seed:local`（`wrangler d1 execute --local --yes --file`）
-- [x] `src/lib/posts.ts` 假数据换成 D1；签名不变；`import { env } from "cloudflare:workers"`；公开查询一律 `status = 'published'`。`listPublishedPosts` 全表带 `body_html`（`ponytail:`：个人博客够用，升级为列表不选正文）。`getPublishedPost` 单行 + prev/next（next=更新、prev=更旧）。`getSpecPageHtml("about")` 读 `site_settings.about_html`，空则回退默认 HTML
+- [x] `src/lib/posts.ts` 假数据换成 D1；`import { env } from "cloudflare:workers"`；公开查询一律 `status = 'published'`。主页 `countPublishedPosts` + `listPublishedCards`（`LIMIT/OFFSET`，不选 `body_html`）；归档 `GET /api/posts` keyset；RSS `listPublishedPostsForRss` 仍带全文。`getPublishedPost` 单行 + prev/next（next=更新、prev=更旧）。`getSpecPageHtml("about")` 读 `site_settings.about_html`，空则回退默认 HTML
 - [x] `posts/[...slug]` 改调 `getPublishedPost`；其余前台页仍走 `content-utils` → `@lib/posts`
 - [x] `vitest.config.ts` 继续不读 wrangler `main`；`miniflare` 加 `d1Databases: ["DB"]`，`readD1Migrations` 从 `@cloudflare/vitest-plugin` 根导出（官方类型注释里的 `/config` 子路径在 1.1 已不存在）。`tests/apply-migrations.ts` 调 `applyD1Migrations`
 - [x] `tests/lib/posts.test.ts`：插入 `draft` + `published`（带 tag），公开列表只含后者，草稿 slug 为 `undefined`。`pnpm test` 前置 `wrangler types`

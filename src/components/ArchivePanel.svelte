@@ -5,16 +5,6 @@ import I18nKey from "../i18n/i18nKey";
 import { i18n } from "../i18n/translation";
 import { getPostUrlBySlug } from "../utils/url-utils";
 
-// Overwritten from the URL query below; defaults keep them optional for the caller (stricter Svelte 5 typing).
-export let tags: string[] = [];
-export let categories: string[] = [];
-export let sortedPosts: Post[] = [];
-
-const params = new URLSearchParams(window.location.search);
-tags = params.has("tag") ? params.getAll("tag") : [];
-categories = params.has("category") ? params.getAll("category") : [];
-const uncategorized = params.get("uncategorized");
-
 interface Post {
 	slug: string;
 	data: {
@@ -30,7 +20,20 @@ interface Group {
 	posts: Post[];
 }
 
+interface ArchiveHit {
+	slug: string;
+	title: string;
+	tags: string[];
+	category: string | null;
+	published: string;
+}
+
 let groups: Group[] = [];
+let yearCounts: Record<number, number> = {};
+let nextCursor: string | null = null;
+let loading = false;
+let exhausted = false;
+let sentinel: HTMLElement | undefined;
 
 function formatDate(date: Date) {
 	const month = (date.getMonth() + 1).toString().padStart(2, "0");
@@ -42,47 +45,109 @@ function formatTag(tagList: string[]) {
 	return tagList.map((t) => `#${t}`).join(" ");
 }
 
-onMount(async () => {
-	let filteredPosts: Post[] = sortedPosts;
-
-	if (tags.length > 0) {
-		filteredPosts = filteredPosts.filter(
-			(post) =>
-				Array.isArray(post.data.tags) &&
-				post.data.tags.some((tag) => tags.includes(tag)),
-		);
+function queryString(cursor: string | null): string {
+	const page = new URLSearchParams(window.location.search);
+	const qs = new URLSearchParams();
+	qs.set("limit", "20");
+	const tag = page.get("tag")?.trim();
+	if (tag) {
+		qs.set("tag", tag);
 	}
-
-	if (categories.length > 0) {
-		filteredPosts = filteredPosts.filter(
-			(post) => post.data.category && categories.includes(post.data.category),
-		);
+	const category = page.get("category")?.trim();
+	if (category) {
+		qs.set("category", category);
 	}
-
-	if (uncategorized) {
-		filteredPosts = filteredPosts.filter((post) => !post.data.category);
+	const uncategorized = page.get("uncategorized");
+	if (uncategorized === "true" || uncategorized === "1") {
+		qs.set("uncategorized", "true");
 	}
+	if (cursor) {
+		qs.set("cursor", cursor);
+	}
+	return qs.toString();
+}
 
-	const grouped = filteredPosts.reduce(
-		(acc, post) => {
-			const year = post.data.published.getFullYear();
-			if (!acc[year]) {
-				acc[year] = [];
+function mergePosts(hits: ArchiveHit[]): void {
+	const byYear = new Map<number, Post[]>();
+	for (const group of groups) {
+		byYear.set(group.year, [...group.posts]);
+	}
+	for (const hit of hits) {
+		const published = new Date(hit.published);
+		const year = published.getFullYear();
+		const bucket = byYear.get(year) ?? [];
+		bucket.push({
+			slug: hit.slug,
+			data: {
+				title: hit.title,
+				tags: hit.tags,
+				category: hit.category,
+				published,
+			},
+		});
+		byYear.set(year, bucket);
+	}
+	groups = [...byYear.entries()]
+		.map(([year, posts]) => ({ year, posts }))
+		.sort((a, b) => b.year - a.year);
+}
+
+async function loadMore(): Promise<void> {
+	if (loading || exhausted) {
+		return;
+	}
+	loading = true;
+	try {
+		const res = await fetch(`/api/posts?${queryString(nextCursor)}`);
+		if (!res.ok) {
+			exhausted = true;
+			return;
+		}
+		const body = (await res.json()) as {
+			posts?: ArchiveHit[];
+			nextCursor?: string | null;
+			yearCounts?: Array<{ year: number; count: number }>;
+		};
+		const hits = Array.isArray(body.posts) ? body.posts : [];
+		if (Array.isArray(body.yearCounts)) {
+			// First page only: totals for year headers so counts don't jump while scrolling.
+			const next: Record<number, number> = {};
+			for (const row of body.yearCounts) {
+				next[row.year] = row.count;
 			}
-			acc[year].push(post);
-			return acc;
-		},
-		{} as Record<number, Post[]>,
-	);
+			yearCounts = next;
+		}
+		mergePosts(hits);
+		nextCursor =
+			typeof body.nextCursor === "string" && body.nextCursor
+				? body.nextCursor
+				: null;
+		if (!nextCursor) {
+			exhausted = true;
+		}
+	} finally {
+		loading = false;
+		if (
+			!exhausted &&
+			sentinel &&
+			sentinel.getBoundingClientRect().top < window.innerHeight
+		) {
+			void loadMore();
+		}
+	}
+}
 
-	const groupedPostsArray = Object.keys(grouped).map((yearStr) => ({
-		year: Number.parseInt(yearStr, 10),
-		posts: grouped[Number.parseInt(yearStr, 10)],
-	}));
-
-	groupedPostsArray.sort((a, b) => b.year - a.year);
-
-	groups = groupedPostsArray;
+onMount(() => {
+	void loadMore();
+	const observer = new IntersectionObserver((entries) => {
+		if (entries.some((entry) => entry.isIntersecting)) {
+			void loadMore();
+		}
+	});
+	if (sentinel) {
+		observer.observe(sentinel);
+	}
+	return () => observer.disconnect();
 });
 </script>
 
@@ -100,7 +165,7 @@ onMount(async () => {
                     ></div>
                 </div>
                 <div class="w-[70%] md:w-[80%] transition text-left text-50">
-                    {group.posts.length} {i18n(group.posts.length === 1 ? I18nKey.postCount : I18nKey.postsCount)}
+                    {yearCounts[group.year] ?? group.posts.length} {i18n((yearCounts[group.year] ?? group.posts.length) === 1 ? I18nKey.postCount : I18nKey.postsCount)}
                 </div>
             </div>
 
@@ -149,4 +214,10 @@ onMount(async () => {
             {/each}
         </div>
     {/each}
+    <div bind:this={sentinel} class="h-8"></div>
+    {#if loading}
+        <p class="py-2 text-center text-sm text-50">Loading…</p>
+    {:else if exhausted && groups.length === 0}
+        <p class="py-2 text-center text-sm text-50">No posts.</p>
+    {/if}
 </div>

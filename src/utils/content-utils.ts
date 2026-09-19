@@ -1,6 +1,11 @@
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
-import { listPublishedPosts } from "@lib/posts";
+import {
+	countPublishedPosts,
+	listPublishedCards,
+	listPublishedCategories,
+	listPublishedTags,
+} from "@lib/posts";
 import { getCategoryUrl } from "@utils/url-utils.ts";
 import type { Page } from "astro";
 import type { PostEntry } from "@/types/post";
@@ -10,54 +15,29 @@ import type { PostEntry } from "@/types/post";
  * Astro Content Collections. Drafts are already excluded by the repository.
  */
 
-export async function getSortedPosts(): Promise<PostEntry[]> {
-	const sorted = await listPublishedPosts();
-
-	for (let i = 1; i < sorted.length; i++) {
-		sorted[i].data.nextSlug = sorted[i - 1].slug;
-		sorted[i].data.nextTitle = sorted[i - 1].data.title;
-	}
-	for (let i = 0; i < sorted.length - 1; i++) {
-		sorted[i].data.prevSlug = sorted[i + 1].slug;
-		sorted[i].data.prevTitle = sorted[i + 1].data.title;
-	}
-
-	return sorted;
-}
-
-export type PostForList = {
-	slug: string;
-	data: PostEntry["data"];
-};
-
-/** Lightweight list for client components (no HTML body crosses the wire). */
-export async function getSortedPostsList(): Promise<PostForList[]> {
-	const sorted = await listPublishedPosts();
-	return sorted.map((post) => ({ slug: post.slug, data: post.data }));
-}
-
 /**
  * SSR replacement for Astro's `paginate()` helper, which only exists in
- * `getStaticPaths`. Returns `undefined` when `current` is out of range so the
- * page can answer 404.
+ * `getStaticPaths`. `items` is the current page slice when `total` is passed.
+ * Returns `undefined` when `current` is out of range so the page can 404.
  */
 export function paginatePosts<T>(
 	items: T[],
 	current: number,
 	pageSize: number,
+	total = items.length,
 ): Page<T> | undefined {
-	const lastPage = Math.max(1, Math.ceil(items.length / pageSize));
+	const lastPage = Math.max(1, Math.ceil(total / pageSize));
 	if (!Number.isInteger(current) || current < 1 || current > lastPage) {
 		return undefined;
 	}
 	const start = (current - 1) * pageSize;
-	const end = Math.min(start + pageSize, items.length);
+	const end = start + items.length;
 	const pageUrl = (p: number) => (p === 1 ? "/" : `/${p}/`);
 	return {
-		data: items.slice(start, end),
+		data: items,
 		start,
-		end: end - 1,
-		total: items.length,
+		end: items.length === 0 ? start : end - 1,
+		total,
 		currentPage: current,
 		size: pageSize,
 		lastPage,
@@ -71,28 +51,30 @@ export function paginatePosts<T>(
 	};
 }
 
+/** Home page of published cards (no HTML bodies). */
+export async function getPublishedCardPage(
+	current: number,
+	pageSize: number,
+): Promise<Page<PostEntry> | undefined> {
+	const total = await countPublishedPosts();
+	const lastPage = Math.max(1, Math.ceil(total / pageSize));
+	if (!Number.isInteger(current) || current < 1 || current > lastPage) {
+		return undefined;
+	}
+	const posts = await listPublishedCards({
+		limit: pageSize,
+		offset: (current - 1) * pageSize,
+	});
+	return paginatePosts(posts, current, pageSize, total);
+}
+
 export type Tag = {
 	name: string;
 	count: number;
 };
 
 export async function getTagList(): Promise<Tag[]> {
-	const allBlogPosts = await listPublishedPosts();
-
-	const countMap: { [key: string]: number } = {};
-	allBlogPosts.forEach((post) => {
-		post.data.tags.forEach((tag: string) => {
-			if (!countMap[tag]) countMap[tag] = 0;
-			countMap[tag]++;
-		});
-	});
-
-	// sort tags
-	const keys: string[] = Object.keys(countMap).sort((a, b) => {
-		return a.toLowerCase().localeCompare(b.toLowerCase());
-	});
-
-	return keys.map((key) => ({ name: key, count: countMap[key] }));
+	return listPublishedTags();
 }
 
 export type Category = {
@@ -102,30 +84,14 @@ export type Category = {
 };
 
 export async function getCategoryList(): Promise<Category[]> {
-	const allBlogPosts = await listPublishedPosts();
-	const count: { [key: string]: number } = {};
-	allBlogPosts.forEach((post) => {
-		if (!post.data.category) {
-			const ucKey = i18n(I18nKey.uncategorized);
-			count[ucKey] = count[ucKey] ? count[ucKey] + 1 : 1;
-			return;
-		}
-
-		const categoryName = post.data.category.trim();
-		count[categoryName] = count[categoryName] ? count[categoryName] + 1 : 1;
+	const rows = await listPublishedCategories();
+	const uncategorized = i18n(I18nKey.uncategorized);
+	return rows.map((row) => {
+		const name = row.name ?? uncategorized;
+		return {
+			name,
+			count: row.count,
+			url: getCategoryUrl(row.name),
+		};
 	});
-
-	const lst = Object.keys(count).sort((a, b) => {
-		return a.toLowerCase().localeCompare(b.toLowerCase());
-	});
-
-	const ret: Category[] = [];
-	for (const c of lst) {
-		ret.push({
-			name: c,
-			count: count[c],
-			url: getCategoryUrl(c),
-		});
-	}
-	return ret;
 }

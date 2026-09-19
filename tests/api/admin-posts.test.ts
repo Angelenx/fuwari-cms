@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { api } from "../../src/api/app";
 import { hashPassword } from "../../src/lib/auth/password";
-import { getPublishedPost, listPublishedPosts } from "../../src/lib/posts";
+import { getPublishedPost, listPublishedCards } from "../../src/lib/posts";
 
 async function loginCookie(): Promise<string> {
 	const username = `user-${crypto.randomUUID()}`;
@@ -289,7 +289,7 @@ describe("admin post CRUD", () => {
 				post: { publishedAt: "2019-01-01T00:00:00.000Z" },
 			});
 
-			const listed = await listPublishedPosts();
+			const listed = await listPublishedCards({ limit: 50, offset: 0 });
 			const slugs = listed.map((post) => post.slug);
 			expect(slugs.indexOf(newerSlug)).toBeLessThan(slugs.indexOf(olderSlug));
 			expect(
