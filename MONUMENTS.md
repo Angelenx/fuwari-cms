@@ -2,6 +2,10 @@
 
 Dated log of major repository changes. Newest first.
 
+## 2026-09-19 — Bilingual GitHub README
+
+The GitHub default `README.md` is English. Simplified Chinese is [`README.zh-CN.md`](./README.zh-CN.md); each file links to the other at the top.
+
 ## 2026-09-19 — Write-time Expressive Code highlighting
 
 Fenced code now goes through `rehype-expressive-code` with Shiki's JavaScript engine so highlighting works in workerd. Existing posts can be refreshed from `/admin` without changing status or dates.

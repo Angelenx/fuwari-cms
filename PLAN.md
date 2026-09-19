@@ -201,8 +201,8 @@
 
 **参考文档：** [Workers · Astro 框架指南](https://developers.cloudflare.com/workers/framework-guides/web-apps/astro/)、[`wrangler d1`](https://developers.cloudflare.com/workers/wrangler/commands/d1/)、[Secrets](https://developers.cloudflare.com/workers/configuration/secrets/)
 
-- [ ] **由仓库所有者按 [README.md](./README.md) 执行：** 替换 `wrangler.jsonc` 的真实 `database_id`；`pnpm db:migrate:remote`；`wrangler secret put SESSION_SECRET`；`pnpm deploy`。代理/助手不代为跑这些远端命令。
-- [x] README 从「预告」改为「一期可用」，含设计思路、技术架构、数据库、环境变量与两种部署路径，并保留 Fuwari（MIT）归属
+- [ ] **由仓库所有者按 [README.md](./README.md)（英文默认）或 [README.zh-CN.md](./README.zh-CN.md) 执行：** 替换 `wrangler.jsonc` 的真实 `database_id`；`pnpm db:migrate:remote`；`wrangler secret put SESSION_SECRET`；`pnpm deploy`。代理/助手不代为跑这些远端命令。
+- [x] README 从「预告」改为「一期可用」，含设计思路、技术架构、数据库、环境变量与两种部署路径，并保留 Fuwari（MIT）归属。GitHub 默认展示英文 [`README.md`](./README.md)，简体中文为 [`README.zh-CN.md`](./README.zh-CN.md)，文首可互相跳转
 - [x] 逐条核对成功标准，写入 README「一期成功标准」（线上验收仍取决于上述远端步骤）
 - [x] `MONUMENTS.md` 记录阶段 5 文档与部署说明就绪（不是「已代为上线」）
 
