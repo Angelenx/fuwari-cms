@@ -72,6 +72,11 @@ export function bootAdminChrome(): void {
 	const renderDialog = document.getElementById("admin-render-progress");
 	const renderBar = document.getElementById("admin-render-bar");
 	const renderCount = document.getElementById("admin-render-count");
+	const renderMessage = document.getElementById("admin-render-message");
+	const browserRenderCopy =
+		"Rendering Markdown in this browser. Please stay on this page — do not leave or refresh.";
+	const cloudRenderCopy =
+		"Rendering Markdown in the cloud. Please stay on this page — do not leave or refresh.";
 	let renderTotal = 0;
 
 	function warnUnload(event: BeforeUnloadEvent): void {
@@ -84,7 +89,11 @@ export function bootAdminChrome(): void {
 			event.preventDefault();
 		});
 		window.showAdminRenderProgress = (opts) => {
-			renderTotal = opts?.total && opts.total > 0 ? opts.total : 0;
+			const cloud = Boolean(opts?.cloud);
+			renderTotal = cloud ? 0 : opts?.total && opts.total > 0 ? opts.total : 0;
+			if (renderMessage) {
+				renderMessage.textContent = cloud ? cloudRenderCopy : browserRenderCopy;
+			}
 			if (renderBar) {
 				renderBar.classList.toggle("is-indeterminate", renderTotal === 0);
 				renderBar.style.width = renderTotal === 0 ? "" : "0%";

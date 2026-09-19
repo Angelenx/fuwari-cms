@@ -7,7 +7,10 @@ declare global {
 		adminToast?: (ok: boolean, message: string) => void;
 		queueAdminToast?: (ok: boolean, message: string) => void;
 		adminNavigate?: (href: string) => Promise<void>;
-		showAdminRenderProgress?: (opts?: { total?: number }) => void;
+		showAdminRenderProgress?: (opts?: {
+			total?: number;
+			cloud?: boolean;
+		}) => void;
 		setAdminRenderProgress?: (n: number) => void;
 		hideAdminRenderProgress?: () => void;
 		adminRenderMarkdown?: (markdown: string) => Promise<{

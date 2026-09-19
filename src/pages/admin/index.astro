@@ -360,7 +360,19 @@ const clientMarkdown = site.clientMarkdown;
 				}
 				return;
 			}
-			const res = await fetch("/api/admin/posts/rerender", { method: "POST" });
+			window.showAdminRenderProgress?.({ cloud: true });
+			let res;
+			try {
+				res = await fetch("/api/admin/posts/rerender", { method: "POST" });
+			} catch {
+				window.hideAdminRenderProgress?.();
+				if (confirmBtn) {
+					confirmBtn.disabled = false;
+				}
+				window.adminToast?.(false, "Could not re-render.");
+				return;
+			}
+			window.hideAdminRenderProgress?.();
 			const body = await res.json().catch(() => ({}));
 			if (!res.ok) {
 				if (confirmBtn) {

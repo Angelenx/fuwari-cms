@@ -273,11 +273,21 @@ const clientMarkdown = site.clientMarkdown;
 			}
 			return;
 		}
-		const res = await fetch("/api/admin/preview", {
-			method: "POST",
-			headers: { "content-type": "application/json" },
-			body: JSON.stringify({ body_md: bodyMd }),
-		});
+		window.showAdminRenderProgress?.({ cloud: true });
+		let res;
+		try {
+			res = await fetch("/api/admin/preview", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ body_md: bodyMd }),
+			});
+		} catch {
+			window.hideAdminRenderProgress?.();
+			errorEl.textContent = "Could not render preview.";
+			errorEl.classList.remove("hidden");
+			return;
+		}
+		window.hideAdminRenderProgress?.();
 		if (!res.ok) {
 			errorEl.textContent = "Could not render preview.";
 			errorEl.classList.remove("hidden");
@@ -305,6 +315,8 @@ const clientMarkdown = site.clientMarkdown;
 				window.adminToast(false, "Could not render Markdown.");
 				return;
 			}
+		} else {
+			window.showAdminRenderProgress?.({ cloud: true });
 		}
 		const url = isNew ? "/api/admin/posts" : `/api/admin/posts/${postId}`;
 		let res;
