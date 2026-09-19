@@ -98,6 +98,7 @@ describe("admin post CRUD", () => {
 				},
 			],
 			["/admin/posts/1", { method: "DELETE" }],
+			["/admin/posts/rerender", { method: "POST" }],
 			["/admin/ai/suggest-title", { method: "POST" }],
 		];
 		for (const [path, init] of paths) {
@@ -348,4 +349,51 @@ describe("admin post CRUD", () => {
 		);
 		expect(res.status).toBe(501);
 	});
+
+	it(
+		"re-renders stored Markdown without changing status or published_at",
+		{ timeout: 30_000 },
+		async () => {
+			const cookie = await loginCookie();
+			const slug = `rerender-${crypto.randomUUID()}`;
+			const publishedAt = "2024-01-02T03:04:05.000Z";
+			await env.DB.prepare(
+				`INSERT INTO posts (
+					slug, title, description, body_md, body_html, excerpt, cover_url,
+					status, category, lang, published_at, updated_at, word_count,
+					reading_minutes, headings_json
+				) VALUES (?, 'Old html', '', ?, '<pre><code>echo hi</code></pre>', '', '',
+					'draft', NULL, 'en', ?, '2024-01-02T03:04:05.000Z', 1, 1, '[]')`,
+			)
+				.bind(slug, "```bash\necho hi\n```", publishedAt)
+				.run();
+
+			const rerendered = await api.request(
+				"/admin/posts/rerender",
+				jsonInit(cookie, "POST"),
+				env,
+			);
+			expect(rerendered.status).toBe(200);
+			const body = (await rerendered.json()) as { count: number };
+			expect(body.count).toBeGreaterThanOrEqual(1);
+
+			const row = await env.DB.prepare(
+				`SELECT body_html, status, published_at, updated_at
+				 FROM posts WHERE slug = ?`,
+			)
+				.bind(slug)
+				.first<{
+					body_html: string;
+					status: string;
+					published_at: string;
+					updated_at: string;
+				}>();
+			expect(row?.status).toBe("draft");
+			expect(row?.published_at).toBe(publishedAt);
+			expect(row?.updated_at).toBe("2024-01-02T03:04:05.000Z");
+			expect(row?.body_html).toContain("expressive-code");
+			expect(row?.body_html).toContain("echo");
+			expect(row?.body_html).not.toBe("<pre><code>echo hi</code></pre>");
+		},
+	);
 });

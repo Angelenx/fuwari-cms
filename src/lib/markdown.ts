@@ -1,13 +1,12 @@
 /**
  * Write-time Markdown renderer. Pages never call this; they read `body_html`.
  *
- * ponytail: Fuwari admonition / GitHub-card / Expressive Code plugins are not
- * wired here — they expect Astro's markdown pipeline (or shiki in workerd).
- * Fence blocks become `<pre><code>`. Upgrade: rehype-expressive-code after it
- * runs in workerd, then wire src/plugins/rehype-component-* via rehype-components.
+ * ponytail: Fuwari admonition / GitHub-card plugins still need rehype-components.
+ * Fence blocks go through rehype-expressive-code (Shiki JS engine for workerd).
  */
 import type { MarkdownHeading } from "astro";
 import { toString as hastToString } from "hast-util-to-string";
+import rehypeExpressiveCode from "rehype-expressive-code";
 import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
 import rehypeStringify from "rehype-stringify";
@@ -17,6 +16,7 @@ import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { type Plugin, unified } from "unified";
 import { visit } from "unist-util-visit";
+import { expressiveCodeConfig } from "../config";
 import { remarkExcerpt } from "../plugins/remark-excerpt";
 import { remarkReadingTime } from "../plugins/remark-reading-time";
 
@@ -60,6 +60,17 @@ const processor = unified()
 	.use(remarkExcerpt as Plugin)
 	.use(remarkReadingTime as Plugin)
 	.use(remarkRehype)
+	.use(
+		// unified's Plugin types don't match EC's async hast transformer.
+		rehypeExpressiveCode as unknown as Plugin<
+			[{ themes: string[]; shiki: { engine: "javascript" } }]
+		>,
+		{
+			themes: [expressiveCodeConfig.theme],
+			// workerd cannot init Shiki's default embedded WASM.
+			shiki: { engine: "javascript" },
+		},
+	)
 	.use(rehypeKatex)
 	.use(rehypeSlug)
 	.use(rehypeCollectHeadings as Plugin)

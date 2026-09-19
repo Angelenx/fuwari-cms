@@ -67,7 +67,7 @@ flowchart LR
 | API | Hono（[`src/api/app.ts`](./src/api/app.ts)，可脱离 Astro 单测） |
 | 数据库 | D1，binding 名 `DB`（不是环境变量） |
 | 鉴权 | 单管理员；PBKDF2-SHA256；D1 `sessions` + HMAC 签名 Cookie `sid` |
-| Markdown | [`src/lib/markdown.ts`](./src/lib/markdown.ts) 仅在写入时运行 |
+| Markdown | [`src/lib/markdown.ts`](./src/lib/markdown.ts) 写入时渲染；围栏走 `rehype-expressive-code`（Shiki JavaScript 引擎） |
 | 公开读 | [`src/lib/posts.ts`](./src/lib/posts.ts)，永远 `status = 'published'` |
 | 后台写 | [`src/lib/admin-posts.ts`](./src/lib/admin-posts.ts)（含草稿） |
 
@@ -161,7 +161,7 @@ pnpm test                        # Vitest，跑在 workerd
 
 `.dev.vars` 里的 `SESSION_SECRET` 换成足够长的随机串。首次打开 http://localhost:4321/admin/login 为用户名 `admin` 设密码（≥ 8，`users` 为空时）。登录后：
 
-- `/admin` 文章（按发布时间轴，可搜，可按 Tag / 状态筛）
+- `/admin` 文章（按发布时间轴，可搜，可按 Tag / 状态筛；**Re-render posts** 用当前渲染器刷新已有贴文 HTML，不改状态和时间）
 - `/admin/profile` 头像、简介、三链、banner
 - `/admin/site` 标题、页脚、默认语言
 - `/admin/about` About Markdown
@@ -385,7 +385,7 @@ CI 里不要写 `pnpm deploy`（同样会撞上 pnpm 内置命令）；也不要
 │   ├── lib/posts.ts          # 公开文章（仅 published）
 │   ├── lib/admin-posts.ts    # 后台文章（含草稿）
 │   ├── lib/site-settings.ts  # 资料 / banner / 站点身份 / about
-│   ├── lib/markdown.ts       # 写入时 Markdown → body_html
+│   ├── lib/markdown.ts       # 写入时 Markdown → body_html（含代码高亮）
 │   ├── lib/auth/             # PBKDF2 + D1 session + 首次设密
 │   ├── plugins/              # 改编自 Fuwari 的 remark 插件
 │   ├── types/post.ts         # PostEntry：预渲染 bodyHtml + 摘要/字数/目录
@@ -406,7 +406,7 @@ CI 里不要写 `pnpm deploy`（同样会撞上 pnpm 内置命令）；也不要
 ## 分期
 
 **一期（MVP，已实现）**  
-登录、文章 CRUD、资料/站点/About、中英 UI、公开列表/详情/标签/归档对齐 Fuwari、草稿不公开、导航搜索（`/api/search`）。
+登录、文章 CRUD、资料/站点/About、中英 UI、公开列表/详情/标签/归档对齐 Fuwari、草稿不公开、导航搜索（`/api/search`）、围栏代码高亮（后台可批量重渲染已有贴文）。
 
 **二期**  
 R2 上传、Workers AI（标题/摘要等）、D1 FTS5。

@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import { renderMarkdown } from "../../src/lib/markdown";
 
 describe("write-time markdown", () => {
-	it("renders gfm, excerpt, headings, and fenced code as pre", async () => {
-		const result = await renderMarkdown(`# Hello
+	it(
+		"renders gfm, excerpt, headings, and highlighted fences",
+		{ timeout: 30_000 },
+		async () => {
+			const result = await renderMarkdown(`# Hello
 
 First paragraph.
 
@@ -17,16 +20,35 @@ First paragraph.
 const n = 1;
 \`\`\`
 `);
-		expect(result.excerpt).toBe("First paragraph.");
-		expect(result.bodyHtml).toContain("<h1");
-		expect(result.bodyHtml).toContain('id="hello"');
-		expect(result.bodyHtml).toContain("<table>");
-		expect(result.bodyHtml).toContain("<pre>");
-		expect(result.bodyHtml).toContain("<code");
-		expect(result.headings.map((h) => h.slug)).toEqual(["hello", "sub-head"]);
-		expect(result.wordCount).toBeGreaterThan(0);
-		expect(result.readingMinutes).toBeGreaterThanOrEqual(1);
-	});
+			expect(result.excerpt).toBe("First paragraph.");
+			expect(result.bodyHtml).toContain("<h1");
+			expect(result.bodyHtml).toContain('id="hello"');
+			expect(result.bodyHtml).toContain("<table>");
+			expect(result.bodyHtml).toContain("expressive-code");
+			expect(result.bodyHtml).toContain("const");
+			expect(result.bodyHtml).toContain("ec-line");
+			expect(result.headings.map((h) => h.slug)).toEqual(["hello", "sub-head"]);
+			expect(result.wordCount).toBeGreaterThan(0);
+			expect(result.readingMinutes).toBeGreaterThanOrEqual(1);
+		},
+	);
+
+	it(
+		"highlights bash fences and escapes HTML in code",
+		{ timeout: 30_000 },
+		async () => {
+			const result = await renderMarkdown(`\`\`\`bash
+wsl --install Ubuntu-22.04
+echo "<script>"
+\`\`\`
+`);
+			expect(result.bodyHtml).toContain("expressive-code");
+			expect(result.bodyHtml).toContain("wsl");
+			expect(result.bodyHtml).toContain("--install");
+			expect(result.bodyHtml).toContain("ec-line");
+			expect(result.bodyHtml).toMatch(/&#x3C;script>|&lt;script&gt;/);
+		},
+	);
 
 	it("renders KaTeX for math", async () => {
 		const result = await renderMarkdown("Euler: $x^2$");

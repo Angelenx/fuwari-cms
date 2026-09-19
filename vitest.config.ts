@@ -28,5 +28,15 @@ export default defineConfig({
 	test: {
 		include: ["tests/**/*.test.ts"],
 		setupFiles: ["./tests/apply-migrations.ts"],
+		// rehype-expressive-code pulls CJS PostCSS; workerd cannot require() its ESM deps
+		// unless Vite pre-bundles the plugin (Cloudflare vitest known-issue).
+		deps: {
+			optimizer: {
+				ssr: {
+					enabled: true,
+					include: ["rehype-expressive-code"],
+				},
+			},
+		},
 	},
 });

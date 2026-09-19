@@ -125,7 +125,7 @@
 
 - [x] 从 `/tmp/fuwari-src`（`6d39b0d`）拷贝：`src/{components,layouts,styles,i18n,utils,constants,types,assets,pages}`、`src/config.ts`、`public/`、`tailwind.config.cjs`、`postcss.config.mjs`、`svelte.config.js`、`biome.json`。`astro.config.mjs` 已按 Astro 7 + Cloudflare adapter 重写。**`src/plugins/` 推迟到阶段 4**（它们只服务 Markdown 渲染链，阶段 1 无消费者）
 - [x] SHA 与文件清单写入 `third_party/fuwari/README.md`；上游文件无逐文件版权头，以该 README + `NOTICE` 归属；`NOTICE` 已更新（含图标集 / 字体许可）
-- [x] Tailwind 保持 3.4，经 `astro.config.mjs` 的 `vite.css.postcss`（postcss-import → tailwindcss/nesting → tailwindcss）接入，不用 `@astrojs/tailwind`。**发现：** 上游 `src/styles/*` 从未被显式 import，全靠 `ImageWrapper` 的 `import.meta.glob("../../**")` 副作用带入；本仓库把 glob 收窄到 `src/assets/**`，在 `Layout.astro` 显式导入，并新增 `src/styles/tailwind.css` 用 `@import` 把 CSS 合成一个 PostCSS root（Tailwind 3 的 `@apply link` 只能引用同 root 内的 `@layer components` 类）。Expressive Code 尚未接入，`prerenderEnvironment` 保持默认 workerd
+- [x] Tailwind 保持 3.4，经 `astro.config.mjs` 的 `vite.css.postcss`（postcss-import → tailwindcss/nesting → tailwindcss）接入，不用 `@astrojs/tailwind`。**发现：** 上游 `src/styles/*` 从未被显式 import，全靠 `ImageWrapper` 的 `import.meta.glob("../../**")` 副作用带入；本仓库把 glob 收窄到 `src/assets/**`，在 `Layout.astro` 显式导入，并新增 `src/styles/tailwind.css` 用 `@import` 把 CSS 合成一个 PostCSS root（Tailwind 3 的 `@apply link` 只能引用同 root 内的 `@layer components` 类）。代码高亮在写入时走 `rehype-expressive-code`（见阶段 4），`prerenderEnvironment` 保持默认 workerd
 - [x] Rust 编译器无报错；`Footer.astro` 中注释里被实体转义的 `&#45;&#45;` 会被 Tailwind 扫成类名并让 Lightning CSS 压缩失败，已删除该死代码（连带删掉不存在的 sitemap 链接）
 - [x] 删除所有 `getCollection` / `astro:content`：新增 `src/types/post.ts`（`PostEntry`：`data` + `bodyHtml` + `excerpt` / `words` / `minutes` / `headings`）与 `src/lib/posts.ts`（阶段 1 为硬编码假数据，公开函数永不返回草稿）；`content-utils.ts` 保持原导出名并新增 `paginatePosts()` 替代只在 `getStaticPaths` 可用的 `paginate()`；`[...page]` / `posts/[...slug]` / `about` / `rss.xml` 改为按需渲染，未知 slug / 页码返回 404
 - [x] 移除 Pagefind 加载脚本（搜索留待 `/api`）；`trailingSlash` 由 `always` 改为 `ignore`（Astro dev 会在 `src/fetch.ts` 之前强制尾斜杠，导致 `/api/health` 404）。`/admin` 关闭 Swup 留到阶段 4 一并做
@@ -182,8 +182,8 @@
 
 - [x] 首次设密：`POST /api/auth/setup`（密码 ≥ 8，用户名固定 `admin`）；`users` 已有行则 409。删除 `scripts/seed-admin.sql` / `db:seed:admin`。登录页按 `needsSetup()` 分支
 - [x] `GET/POST /api/admin/posts`，`GET/PUT/DELETE /api/admin/posts/:id`，`POST /api/admin/preview`；草稿只走 `src/lib/admin-posts.ts`，公开查询仍只用 `src/lib/posts.ts`
-- [x] 写入时：校验 slug 唯一与 kebab 格式；`src/lib/markdown.ts` 用 `unified` + `remark-gfm` / `remark-math` + 改编自 Fuwari 的 excerpt / reading-time 插件 + `rehype-katex` / `rehype-slug` 渲染 `body_html`，并算 `word_count` / `reading_minutes` / `headings_json`
-- [x] **风险：** 未接入 `rehype-expressive-code` / shiki（`ponytail:` 围栏块为 `<pre><code>`；升级路径写在 `markdown.ts`）。Fuwari admonition / GitHub card 已拷入 `src/plugins/` 但未接线
+- [x] 写入时：校验 slug 唯一与 kebab 格式；`src/lib/markdown.ts` 用 `unified` + `remark-gfm` / `remark-math` + 改编自 Fuwari 的 excerpt / reading-time 插件 + `rehype-katex` / `rehype-slug` / `rehype-expressive-code`（Shiki `engine: "javascript"`，workerd 无 WASM）渲染 `body_html`，并算 `word_count` / `reading_minutes` / `headings_json`
+- [x] 已有贴文：鉴权 `POST /api/admin/posts/rerender` + 后台 **Re-render posts**；只重写 HTML / excerpt / 字数 / 目录，不改 `published_at`、状态、slug、标签、`updated_at`。Fuwari admonition / GitHub card 已拷入 `src/plugins/` 但未接线
 - [x] `/admin` 文章列表 + 快捷发布/撤回/删除；`/admin/posts/new`、`/admin/posts/:id`。Swup `ignore` `/admin`
 - [x] 编辑页：标题 / slug / 摘要 / 标签 / 封面 URL / 状态 / Markdown 大文本框 / 预览
 - [x] `POST /api/admin/ai/:name` 一律返回 `501`

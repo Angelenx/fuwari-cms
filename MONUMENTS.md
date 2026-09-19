@@ -2,6 +2,10 @@
 
 Dated log of major repository changes. Newest first.
 
+## 2026-09-19 — Write-time Expressive Code highlighting
+
+Fenced code now goes through `rehype-expressive-code` with Shiki's JavaScript engine so highlighting works in workerd. Existing posts can be refreshed from `/admin` without changing status or dates.
+
 ## 2026-09-18 — Public navbar search via D1
 
 Navbar search calls `GET /api/search` with a published-only `LIKE` query. Pagefind is gone; drafts never appear. FTS5 stays a later upgrade.

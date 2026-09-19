@@ -22,7 +22,7 @@ Copied verbatim, then adapted where noted:
 | `biome.json`, `tailwind.config.cjs` | unchanged |
 | `postcss.config.mjs`, `svelte.config.js` | inlined into `astro.config.mjs`, files removed |
 
-Not taken: `src/content/**` (Content Collections), Fuwari Expressive Code helpers (write-time renderer uses `<pre><code>`; see `src/plugins/README.md`), `astro.config.mjs` (rewritten), Pagefind wiring, `@astrojs/tailwind`, `@astrojs/sitemap`.
+Not taken: `src/content/**` (Content Collections), Fuwari Expressive Code helpers (write-time renderer uses `rehype-expressive-code` in `src/lib/markdown.ts` instead), `astro.config.mjs` (rewritten), Pagefind wiring, `@astrojs/tailwind`, `@astrojs/sitemap`.
 
 Taken and adapted in phase 4:
 

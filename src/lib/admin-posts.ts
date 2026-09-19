@@ -364,3 +364,43 @@ export async function deletePost(id: number): Promise<boolean> {
 		.run();
 	return (result.meta.changes ?? 0) > 0;
 }
+
+/**
+ * Re-run write-time Markdown for every post. Does not touch status, slug,
+ * tags, published_at, or updated_at.
+ *
+ * ponytail: one full-table pass for a personal blog. Upgrade: chunked
+ * Worker/queue if this times out on a large archive.
+ */
+export async function rerenderAllPosts(): Promise<number> {
+	const { results } = await env.DB.prepare(
+		"SELECT id, body_md FROM posts",
+	).all<{ id: number; body_md: string }>();
+	const rendered = await Promise.all(
+		results.map(async (row) => ({
+			id: row.id,
+			html: await renderMarkdown(row.body_md),
+		})),
+	);
+	if (rendered.length === 0) {
+		return 0;
+	}
+	await env.DB.batch(
+		rendered.map(({ id, html }) =>
+			env.DB.prepare(
+				`UPDATE posts SET
+					body_html = ?, excerpt = ?, word_count = ?, reading_minutes = ?,
+					headings_json = ?
+				 WHERE id = ?`,
+			).bind(
+				html.bodyHtml,
+				html.excerpt,
+				html.wordCount,
+				html.readingMinutes,
+				JSON.stringify(html.headings),
+				id,
+			),
+		),
+	);
+	return rendered.length;
+}

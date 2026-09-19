@@ -7,6 +7,7 @@ import {
 	listAdminPosts,
 	type PostWriteInput,
 	parseAdminPostListFilter,
+	rerenderAllPosts,
 	updatePost,
 } from "../lib/admin-posts";
 import { hashPassword, verifyPassword } from "../lib/auth/password";
@@ -259,6 +260,10 @@ const posts = new Hono<AppEnv>()
 			}
 			throw err;
 		}
+	})
+	.post("/rerender", async (c) => {
+		const count = await rerenderAllPosts();
+		return c.json({ count });
 	})
 	.get("/:id", async (c) => {
 		const id = parseId(c.req.param("id"));

@@ -61,13 +61,18 @@ const emptyMessage = hasFilters ? "No posts match." : "No posts yet.";
 ---
 
 <AdminChrome loggedIn title="Posts">
-	<a
-		class="btn-regular rounded-lg px-3 py-2 text-sm"
-		href="/admin/posts/new"
-		slot="actions"
-	>
-		New post
-	</a>
+	<div class="flex flex-wrap gap-2" slot="actions">
+		<button
+			class="btn-regular rounded-lg px-3 py-2 text-sm"
+			id="rerender-posts"
+			type="button"
+		>
+			Re-render posts
+		</button>
+		<a class="btn-regular rounded-lg px-3 py-2 text-sm" href="/admin/posts/new">
+			New post
+		</a>
+	</div>
 	<form
 		action="/admin"
 		class="card-base mb-4 flex flex-wrap items-end gap-3 p-4"
@@ -232,6 +237,30 @@ const emptyMessage = hasFilters ? "No posts match." : "No posts yet.";
 			}
 			const href = params.size ? `/admin?${params}` : "/admin";
 			void window.adminNavigate(href);
+		});
+
+		document.getElementById("rerender-posts")?.addEventListener("click", async () => {
+			if (
+				!confirm(
+					"Re-render all posts from stored Markdown? Status and dates stay the same.",
+				)
+			) {
+				return;
+			}
+			const res = await fetch("/api/admin/posts/rerender", { method: "POST" });
+			const body = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				window.adminToast?.(
+					false,
+					typeof body.error === "string" ? body.error : "Could not re-render.",
+				);
+				return;
+			}
+			window.queueAdminToast?.(
+				true,
+				`Re-rendered ${typeof body.count === "number" ? body.count : 0} posts.`,
+			);
+			location.reload();
 		});
 
 		document.querySelectorAll("[data-action]").forEach((button) => {
