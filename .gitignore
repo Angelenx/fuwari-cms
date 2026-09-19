@@ -21,4 +21,4 @@ worker-configuration.d.ts
 # logs
 *.log
 .DS_Store
-src/assets/images/my_*.jpg
+src/assets/images/my-*.jpg
